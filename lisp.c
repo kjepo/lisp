@@ -144,15 +144,15 @@ void display(Obj expr) {
   display2(expr, 0);
 }
 
-int is_self_evaluating() { return objtype(expr) == NUM_TAG; }
-int is_variable()        { return objtype(expr) == ATOM_TAG; }
-int is_quote() { return QUOTE_ATOM == car(expr); }
-int is_if() { return 0; }
-int is_assignment() { return 0; }
-int is_definition() { return 0; }
-int is_lambda() { return 0; }
-int is_begin() { return 0; }
-int is_application() { return 0; }
+int is_self_evaluating() { return NUM_TAG == objtype(expr); }
+int is_variable()        { return ATOM_TAG == objtype(expr); }
+int is_quote()           { return QUOTE_ATOM == car(expr); }
+int is_if()              { return 0; }
+int is_assignment()      { return 0; }
+int is_definition()      { return 0; }
+int is_lambda()          { return 0; }
+int is_begin()           { return 0; }
+int is_application()     { return 0; }
 
 
 void eval_dispatch() {
