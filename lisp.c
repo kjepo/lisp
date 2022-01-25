@@ -28,9 +28,6 @@ Obj mkatom(char *id) {
   return n | (ATOM_TAG << 30);
 }
 
-// use cons instead
-// Obj mkpair(int n) { return n | (PAIR_TAG << 30); }
-
 Obj mkproc(int n) {
   return n | (PROC_TAG << 30);
 }
@@ -67,17 +64,6 @@ Obj cons(Obj car, Obj cdr) {
 Obj NIL_ATOM, TRUE_ATOM, IF_ATOM, EQ_ATOM, LET_ATOM, ADD_ATOM, SUB_ATOM,
   MUL_ATOM, DIV_ATOM, DEFINE_ATOM, CAR_ATOM, CDR_ATOM, CONS_ATOM, ATOM_ATOM,
   QUOTE_ATOM, LETREC_ATOM, LAMBDA_ATOM;
-
-/*
- (set! stack '())
- (define exp expression)
-   (define env primitive-procedures)
-   (define cont print-result)
-   (define val #f)
-   (define unev #f)
-   (define argl #f)
-   (define proc #f)
-*/
 
 typedef enum {
   PRINT_RESULT,			/* 0 */
@@ -223,6 +209,4 @@ int main() {
   eval_dispatch();
   expr = cons(QUOTE_ATOM, cons(mknum(17), 0));
   eval_dispatch();
-
-
 }
