@@ -10,12 +10,12 @@ typedef uint32_t Obj;
 
 // Objects are tagged with 2 most significant bits
 // number      00bbbbbb ... bbbbbbbb
-// atom        01bbbbbb ... bbbbbbbb
+// symbol        01bbbbbb ... bbbbbbbb
 // pair        10bbbbbb ... bbbbbbbb
 // procedure   11bbbbbb ... bbbbbbbb
 
 #define PAIR_TAG 0
-#define ATOM_TAG 1
+#define SYMBOL_TAG 1
 #define NUM_TAG  2
 #define PROC_TAG 3
 
@@ -23,9 +23,9 @@ Obj mknum(int n) {
   return n | (NUM_TAG << 30);
 }
 
-Obj mkatom(char *id) {
+Obj mksym(char *id) {
   int n = lookup(id);
-  return n | (ATOM_TAG << 30);
+  return n | (SYMBOL_TAG << 30);
 }
 
 Obj mkproc(int n) {
@@ -61,9 +61,9 @@ Obj cons(Obj car, Obj cdr) {
 }
 
 
-Obj NIL_ATOM, TRUE_ATOM, IF_ATOM, EQ_ATOM, LET_ATOM, ADD_ATOM, SUB_ATOM,
-  MUL_ATOM, DIV_ATOM, DEFINE_ATOM, CAR_ATOM, CDR_ATOM, CONS_ATOM, ATOM_ATOM,
-  QUOTE_ATOM, LETREC_ATOM, LAMBDA_ATOM;
+Obj NIL_SYM, TRUE_SYM, IF_SYM, EQ_SYM, LET_SYM, ADD_SYM, SUB_SYM,
+  MUL_SYM, DIV_SYM, DEFINE_SYM, CAR_SYM, CDR_SYM, CONS_SYM, ATOM_SYM,
+  QUOTE_SYM, LETREC_SYM, LAMBDA_SYM;
 
 typedef enum {
   PRINT_RESULT,			/* 0 */
@@ -88,23 +88,44 @@ typedef enum {
 } Continuation;
 
 Continuation cont;
-Obj Stack[1024];
+Obj Stack[10];
+int StackPtr;
 Obj val, unev, argl, proc;
 Obj expr;
 
+
+
+void push(Obj value) {
+  Stack[StackPtr++] = value;
+  if (StackPtr > sizeof(Stack)/sizeof(Stack[0])) {
+    fprintf(stderr, "Stack overflow!\n");
+    exit(1);
+  }
+}
+
+Obj pop() {
+  if (StackPtr <= 0) {
+    fprintf(stderr, "Stack underflow!\n");
+    exit(1);
+  }
+  return Stack[--StackPtr];
+}
+
+
 void init() {
-  NIL_ATOM = mkatom("NIL"); TRUE_ATOM = mkatom("TRUE"); IF_ATOM = mkatom("IF");
-  EQ_ATOM = mkatom("EQ");   LET_ATOM = mkatom("LET"); ADD_ATOM = mkatom("ADD");
-  SUB_ATOM = mkatom("SUB"); MUL_ATOM = mkatom("MUL"); DIV_ATOM = mkatom("DIV");
-  CAR_ATOM = mkatom("CAR"); CDR_ATOM = mkatom("CDR");
-  CONS_ATOM = mkatom("CONS"); ATOM_ATOM = mkatom("ATOM");
-  QUOTE_ATOM = mkatom("QUOTE"); LETREC_ATOM = mkatom("LETREC");
-  DEFINE_ATOM = mkatom("DEFINE"); LAMBDA_ATOM = mkatom("LAMBDA");
+  NIL_SYM = mksym("NIL"); TRUE_SYM = mksym("TRUE"); IF_SYM = mksym("IF");
+  EQ_SYM = mksym("EQ");   LET_SYM = mksym("LET"); ADD_SYM = mksym("ADD");
+  SUB_SYM = mksym("SUB"); MUL_SYM = mksym("MUL"); DIV_SYM = mksym("DIV");
+  CAR_SYM = mksym("CAR"); CDR_SYM = mksym("CDR");
+  CONS_SYM = mksym("CONS"); ATOM_SYM = mksym("ATOM");
+  QUOTE_SYM = mksym("QUOTE"); LETREC_SYM = mksym("LETREC");
+  DEFINE_SYM = mksym("DEFINE"); LAMBDA_SYM = mksym("LAMBDA");
   cont = EVAL_DISPATCH;
-  val = NIL_ATOM;
-  unev = NIL_ATOM;
-  argl = NIL_ATOM;
-  proc = NIL_ATOM;
+  val = NIL_SYM;
+  unev = NIL_SYM;
+  argl = NIL_SYM;
+  proc = NIL_SYM;
+  StackPtr = 0;
 }
 
 void display(Obj expr);
@@ -127,7 +148,7 @@ void display2(Obj expr, int dotted) {
 	printf(")");
     }
     break;
-  case ATOM_TAG:
+  case SYMBOL_TAG:
     printf("%s", find(objval(expr)));
     break;
   case NUM_TAG:
@@ -145,11 +166,11 @@ void display(Obj expr) {
 }
 
 int is_self_evaluating() { return NUM_TAG == objtype(expr); }
-int is_variable()        { return ATOM_TAG == objtype(expr); }
-int is_quote()           { return QUOTE_ATOM == car(expr); }
+int is_variable()        { return SYMBOL_TAG == objtype(expr); }
+int is_quote()           { return QUOTE_SYM == car(expr); }
 int is_if()              { return 0; }
 int is_assignment()      { return 0; }
-int is_definition()      { return 0; }
+int is_definition()      { return DEFINE_SYM == car(expr); }
 int is_lambda()          { return 0; }
 int is_begin()           { return 0; }
 int is_application()     { return 0; }
@@ -168,16 +189,25 @@ void eval_dispatch() {
 	val = expr;
 	continue;
       } else if (is_variable()) {
-	cont = EV_VARIABLE;
+	// ...
+	continue;
       } else if (is_quote()) {
 	val = car(cdr(expr));
 	continue;
       } else if (is_if()) {
-	cont = EV_IF;
+	// ...
+	continue;
       } else if (is_assignment()) {
-	cont = EV_ASSIGNMENT;
+	// ...
+	continue;
       } else if (is_definition()) {
-	cont = EV_DEFINITION;
+	unev = car(cdr(expr));
+	push(unev);
+	expr = car(cdr(cdr(expr)));
+	//	push(env);
+	push(cont);
+	cont = EV_DEFINITION_1;
+	continue;
       } else if (is_lambda()) {
 	cont = EV_LAMBDA;
       } else if (is_begin()) {
@@ -205,8 +235,7 @@ int main() {
   //  testhashtab();
   // dumphashtab();
   expr = mknum(42);
-  init();
   eval_dispatch();
-  expr = cons(QUOTE_ATOM, cons(mknum(17), 0));
+  expr = cons(QUOTE_SYM, cons(mknum(17), 0));
   eval_dispatch();
 }
