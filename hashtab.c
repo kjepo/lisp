@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include "hashtab.h"
 
-#define HASHTABSIZ 20
+#define HASHTABSIZ 25
 
 struct {
   char *id;
@@ -35,9 +35,10 @@ char *find(int index) {
 }
 
 
-void dumphashtab() {
+void dump_hashtab() {
+  printf("   HASH TABLE:\n");
   for (int i = 0; i < HASHTABSIZ; i++)
-    printf("%3d: %s\n", i, (hashtab[i].id ? hashtab[i].id : ""));
+    printf("%4d: %s\n", i, (hashtab[i].id ? hashtab[i].id : ""));
 }
 
 void testhashtab() {
@@ -48,7 +49,7 @@ void testhashtab() {
   int i5 = lookup("NIL");
   int i6 = lookup("LAMBDA");
   int i7 = lookup("CAR");
-  dumphashtab();
+  dump_hashtab();
   if (i1 != i7) {
     fprintf(stderr, "i1=%d and i7=%d are different\n", i1, i7);
     exit(1);

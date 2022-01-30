@@ -3,7 +3,7 @@
 
 int lookup(char *name);
 char *find(int index);
-void dumphashtab();
+void dump_hashtab();
 void testhashtab();
 
 
