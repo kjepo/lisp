@@ -17,3 +17,8 @@ clean:
 
 print:
 	enscript -2Gr -o print.ps *.c
+
+git:
+	git add *.[ch] Makefile
+	git commit -m "Automatic update"
+	git push
