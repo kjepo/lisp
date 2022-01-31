@@ -3,11 +3,10 @@ CFILES   = $(wildcard *.c)
 OBJFILES = $(CFILES:.c=.o)
 
 CC      = gcc
-CFLAGS  = -g
-#CFLAGS = -Wall -Werror -Wmissing-prototypes
-#CFLAGS  = -Wall -I /additional/include/dir
-#LDFLAGS = -L /additional/lib/dir
-#LDLIBS  = -ldependency1 -ldependency2
+CFLAGS  = -g -I/opt/homebrew/opt/readline/include/
+LDLIBS  = -lreadline
+LDFLAGS ="-L/opt/homebrew/opt/readline/lib"
+
 
 $(OUT): $(OBJFILES)
 

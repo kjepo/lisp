@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <readline/readline.h>
 #include "lisp.h"
 #include "hashtab.h"
 
@@ -275,10 +276,6 @@ void init() {
   False = mkbool("#f");
 }
 
-// need to decide what we use for true/false
-// right now NIL is treated as a pair and makes is_application true
-
-
 int is_self_evaluating() { return NUM_TAG == objtype(expr) || BOOL_TAG == objtype(expr); }
 int is_variable()        { return SYMBOL_TAG == objtype(expr); }
 int is_quote()           { return PAIR_TAG == objtype(expr) && QUOTE_SYM == CAR(expr); }
@@ -290,7 +287,6 @@ int is_begin()           { return 0; }
 int is_application()     { return PAIR_TAG == objtype(expr); }
 int is_primitive(Obj proc) { return 1; }
 int is_compound(Obj proc)  { return 0; }
-
 
 #include "debug.h"
 
@@ -601,6 +597,12 @@ int main(int argc, char *argv[]) {
       }
     }
   }
+
+  /*
+  printf("testing readline:\n");
+  char* input = readline("prompt> ");
+  printf("%s\n", input);
+  */
 
   init();
   setup_environment();
