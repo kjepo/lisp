@@ -1,10 +1,5 @@
 /*
- * This doesn't work 
- *
- * (define id (lambda (x) x))
- * (id 3)
- *
- * Also, this changes global x
+ * this changes global x
  *
  * (lambda (x) x) 3)
  *
@@ -12,6 +7,8 @@
  *
  * lisp should add ".scm" if it isn't provided 
  * after reading filename.scm it should continue reading from stdin
+ *
+ * Ignore extra ')' when parsing
  *
  */
 
@@ -711,9 +708,9 @@ void expect(Token tok, char *msg) {
 Obj parse_atom() {
   Obj x;
   char *p;
-  if (token == ID) {
+  if (token == ID)
     x = mksym(id);
-  } else if (token == NUM)
+  else if (token == NUM)
     x = mknum(nval);
   else
     error("expected number or symbol.");
@@ -750,7 +747,9 @@ Obj parse() {			/* recursive-descent parser */
   else if (token == LPAR) {
     scan();
     return parse2();
-  } else if (token == END)
+  } else if (token == RPAR) 
+    scan();
+  else if (token == END)
     return 0;
   else
     error("expected number, symbol, or '('.");

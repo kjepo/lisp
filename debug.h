@@ -51,6 +51,9 @@ void display2(Obj expr, int dotted) {
   case BOOL_TAG:
     printf("%s", (expr == False ? "#f" : "#t"));
     break;
+  case ARRAY_TAG:
+    printf("<array>");
+    break;
   default:
     fprintf(stderr, "display2: can't happen: %d\n", objtype(expr));
     exit(1);
