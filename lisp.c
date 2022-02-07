@@ -66,13 +66,13 @@ Obj free_index = 1;                    // can't start at 0 because 0 means NIL
 
 Obj NIL = 0;
 
-#define CAR(p) (thecars[p])
-#define CDR(p) (thecdrs[p])
-#define CDDR(p) (CDR(CDR(p)))
-#define CDDDR(p) (CDR(CDR(CDR(p))))
-#define CADR(p) (CAR(CDR(p)))
-#define CADDR(p) (CAR(CDR(CDR(p))))
-#define CADDDR(p) (CAR(CDR(CDR(CDR(p)))))
+#define car(p) (thecars[p])
+#define cdr(p) (thecdrs[p])
+#define cddr(p) (cdr(cdr(p)))
+#define cdddr(p) (cdr(cdr(cdr(p))))
+#define cadr(p) (car(cdr(p)))
+#define caddr(p) (car(cdr(cdr(p))))
+#define cadddr(p) (car(cdr(cdr(cdr(p)))))
 
 Obj mknum(int n) { return n | (NUM_TAG << 29); }
 Obj mksym(char *id) { return lookup(id) | (SYMBOL_TAG << 29); }
@@ -81,8 +81,8 @@ Obj mkbool(char *id) { return lookup(id) | (BOOL_TAG << 29); }
 Obj cons(Obj car_, Obj cdr_) {  /* aka mkpair */
   if (free_index > MEMSIZE)
       error("Error: memory full!");
-  CAR(free_index) = car_;
-  CDR(free_index) = cdr_;
+  car(free_index) = car_;
+  cdr(free_index) = cdr_;
   return free_index++ | (PAIR_TAG << 29);
 }
 
@@ -91,7 +91,7 @@ Obj list(Obj p) {
 }
 
 Obj append(Obj l, Obj m) {
-  return (l == NIL ? m : cons(CAR(l), append(CDR(l), m)));
+  return (l == NIL ? m : cons(car(l), append(cdr(l), m)));
 }
 
 Obj adjoin_arg(Obj arg, Obj arglist) {
@@ -110,6 +110,11 @@ typedef enum {
   PRIM_CDR,
   PRIM_CONS,
   PRIM_PAIRP,
+  PRIM_PLUS,
+  PRIM_MINUS,
+  PRIM_TIMES,
+  PRIM_EQ,
+  
 } Primitive;
 
 Obj mkprim(Primitive p) {
@@ -195,8 +200,8 @@ Obj pairup(Obj vars, Obj vals) {
   if (vars == NIL)
     return NIL;
   else
-    return cons(cons(CAR(vars), CAR(vals)),
-                pairup(CDR(vars), CDR(vals)));
+    return cons(cons(car(vars), car(vals)),
+                pairup(cdr(vars), cdr(vals)));
 }
 
 Obj bind(Obj vars, Obj vals, Obj env) {
@@ -208,10 +213,10 @@ Obj bind1(Obj var, Obj value, Obj env) {
 }
 
 void prepend(Obj x, Obj l) {
-  Obj first = CAR(l);
-  Obj rest = CDR(l);
-  CAR(l) = x;
-  CDR(l) = cons(first, rest);
+  Obj first = car(l);
+  Obj rest = cdr(l);
+  car(l) = x;
+  cdr(l) = cons(first, rest);
 }
 
 void add_binding(Obj var, Obj val, Obj env) {
@@ -223,10 +228,10 @@ void add_binding(Obj var, Obj val, Obj env) {
 Obj assoc(Obj var, Obj env) {
   if (env == NIL)
     return NIL;
-  else if (CAR(CAR(env)) == var)
-    return CAR(env);
+  else if (car(car(env)) == var)
+    return car(env);
   else
-    return assoc(var, CDR(env));
+    return assoc(var, cdr(env));
 }
 
 Obj env_lookup(Obj var, Obj env) {      /* env[var] */
@@ -235,7 +240,7 @@ Obj env_lookup(Obj var, Obj env) {      /* env[var] */
     unbound(var);
     return NIL;
   } else
-    return CDR(pair);
+    return cdr(pair);
 }
 
 void set_variable_value(Obj var, Obj val, Obj env) {
@@ -243,13 +248,13 @@ void set_variable_value(Obj var, Obj val, Obj env) {
   if (pair == NIL)
     unbound(var);
   else
-    CDR(pair) = val;
+    cdr(pair) = val;
 }
 
 void define_variable(Obj var, Obj val, Obj env) {
   Obj pair = assoc(var, env);
   if (pair != NIL)
-    CDR(pair) = val;            /* overwrite old definition */
+    cdr(pair) = val;            /* overwrite old definition */
   else
     add_binding(var, val, env);
 }
@@ -309,6 +314,10 @@ void init_env() {
   primitive_procedures = bind1(mksym("cdr"), mkprim(PRIM_CDR), primitive_procedures);
   primitive_procedures = bind1(mksym("cons"), mkprim(PRIM_CONS), primitive_procedures);
   primitive_procedures = bind1(mksym("pair?"), mkprim(PRIM_PAIRP), primitive_procedures);
+  primitive_procedures = bind1(mksym("+"), mkprim(PRIM_PLUS), primitive_procedures);
+  primitive_procedures = bind1(mksym("-"), mkprim(PRIM_MINUS), primitive_procedures);
+  primitive_procedures = bind1(mksym("*"), mkprim(PRIM_TIMES), primitive_procedures);
+  primitive_procedures = bind1(mksym("="), mkprim(PRIM_EQ), primitive_procedures);
 }
 
 // problem is mk_proc creates a list and adds a tag which is not a pair that CAR/CDR works on
@@ -316,11 +325,11 @@ void init_env() {
 int is_pair(expr)        { return PAIR_TAG == objtype(expr) && expr != NIL; }
 int is_self_evaluating() { return NUM_TAG == objtype(expr) || BOOL_TAG == objtype(expr); }
 int is_variable()        { return SYMBOL_TAG == objtype(expr); }
-int is_quote()           { return PAIR_TAG == objtype(expr) && QUOTE_SYM == CAR(expr); }
-int is_if()              { return PAIR_TAG == objtype(expr) && IF_SYM == CAR(expr); }
-int is_assignment()      { return PAIR_TAG == objtype(expr) && SETBANG_SYM == CAR(expr); }
-int is_definition()      { return PAIR_TAG == objtype(expr) && DEFINE_SYM == CAR(expr); }
-int is_lambda()          { return PAIR_TAG == objtype(expr) && LAMBDA_SYM == CAR(expr); }
+int is_quote()           { return PAIR_TAG == objtype(expr) && QUOTE_SYM == car(expr); }
+int is_if()              { return PAIR_TAG == objtype(expr) && IF_SYM == car(expr); }
+int is_assignment()      { return PAIR_TAG == objtype(expr) && SETBANG_SYM == car(expr); }
+int is_definition()      { return PAIR_TAG == objtype(expr) && DEFINE_SYM == car(expr); }
+int is_lambda()          { return PAIR_TAG == objtype(expr) && LAMBDA_SYM == car(expr); }
 int is_begin()           { return 0; }
 int is_application()     { return PAIR_TAG == objtype(expr); }
 int is_primitive(Obj p)  { return PRIM_TAG == objtype(p); }
@@ -329,12 +338,16 @@ int is_compound(Obj p)   { return PROC_TAG == objtype(p); }
 /* argl is a list of arguments (a1 a2 a3 .. aN) */
 /* if the primitive function only takes one argument, it is a1 */
 /* if the primitive function takes two arguments, they are a1 and a2 */
-void prim_car()   { val = CAR(CAR(argl)); }
-void prim_cdr()   { val = CDR(CAR(argl)); }
-void prim_cons()  { val = cons(CAR(argl), CADR(argl)); }
-void prim_pairp() { val = is_pair(CAR(argl)) ? True : False; }
+void prim_car()   { val = car(car(argl)); }
+void prim_cdr()   { val = cdr(car(argl)); }
+void prim_cons()  { val = cons(car(argl), cadr(argl)); }
+void prim_pairp() { val = is_pair(car(argl)) ? True : False; }
+void prim_plus()  { val = mknum(objval(car(argl)) + objval(cadr(argl))); }
+void prim_minus() { val = mknum(objval(car(argl)) - objval(cadr(argl))); }
+void prim_times() { val = mknum(objval(car(argl)) * objval(cadr(argl))); }
+void prim_eq()    { val = (car(argl) == cadr(argl) ? True : False); }
 
-void (*primitives[])() = { prim_car, prim_cdr, prim_cons, prim_pairp };
+void (*primitives[])() = { prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq };
 
 
 #include "debug.h"
@@ -362,8 +375,8 @@ void eval_dispatch() {
     case EV_APPL_OPERAND_LOOP:
       display_registers("EV_APPL_OPERAND_LOOP");
       push(argl);
-      expr = CAR(unev);         /* 1st operand */
-      if (!CDR(unev)) {         /* last operand */
+      expr = car(unev);         /* 1st operand */
+      if (!cdr(unev)) {         /* last operand */
         label = EV_APPL_LAST_ARG;
       } else {
         push(env);
@@ -399,17 +412,17 @@ void eval_dispatch() {
 
     case COMPOUND_APPLY:
       display_registers("COMPOUND_APPLY");
-      unev = CAR(objval(proc));      /* procedure parameters */
-      env = CADDR(objval(proc));     /* procedure environment */
+      unev = car(objval(proc));      /* procedure parameters */
+      env = caddr(objval(proc));     /* procedure environment */
       env = bind(unev, argl, env);
-      unev = CADR(objval(proc));     /* procedure body */
+      unev = cadr(objval(proc));     /* procedure body */
       label = EV_SEQUENCE;
       continue;
 
     case EV_SEQUENCE:
       display_registers("EV_SEQUENCE");
-      expr = CAR(unev);         /* first expression */
-      if (!CDR(unev))           /* last expression */
+      expr = car(unev);         /* first expression */
+      if (!cdr(unev))           /* last expression */
         label = EV_SEQUENCE_LAST_EXP;
       else {
         push(unev);
@@ -437,7 +450,7 @@ void eval_dispatch() {
       display_registers("EV_SEQUENCE_CONTINUE");
       env = pop();
       unev = pop();
-      unev = CDR(unev);
+      unev = cdr(unev);
       label = EV_SEQUENCE;
       continue;
 
@@ -447,7 +460,7 @@ void eval_dispatch() {
       env = pop();
       argl = pop();
       argl = adjoin_arg(val, argl);
-      unev = CDR(unev);         /* rest operands */
+      unev = cdr(unev);         /* rest operands */
       label = EV_APPL_OPERAND_LOOP;
       continue;
 
@@ -473,7 +486,7 @@ void eval_dispatch() {
 
     case EV_QUOTED:
       display_registers("EV_QUOTED");
-      val = CADR(expr);
+      val = cadr(expr);
       label = cont;
       continue;
 
@@ -483,7 +496,7 @@ void eval_dispatch() {
       push(env);
       push(cont);
       cont = EV_IF_DECIDE;
-      expr = CADR(expr);        /* if-predicate */
+      expr = cadr(expr);        /* if-predicate */
       label = EVAL_DISPATCH;
       continue;
 
@@ -497,14 +510,14 @@ void eval_dispatch() {
 
     case EV_IF_CONSEQUENT:
       display_registers("EV_IF_CONSEQUENT");
-      expr = CADDR(expr);       /* if-consequent */
+      expr = caddr(expr);       /* if-consequent */
       label = EVAL_DISPATCH;
       continue;
 
     case EV_IF_ALTERNATIVE:
       display_registers("EV_IF_ALTERNATIVE");
-      if (CDDDR(expr))
-        expr = CADDDR(expr);
+      if (cdddr(expr))
+        expr = cadddr(expr);
       else
         expr = NIL;
       label = EVAL_DISPATCH;
@@ -512,9 +525,9 @@ void eval_dispatch() {
 
     case EV_ASSIGNMENT:
       display_registers("EV_ASSIGNMENT");
-      unev = CADR(expr);        /* assignment variable */
+      unev = cadr(expr);        /* assignment variable */
       push(unev);
-      expr = CADDR(expr); /* assignment value */
+      expr = caddr(expr); /* assignment value */
       push(env);
       push(cont);
       cont = EV_ASSIGNMENT_1;
@@ -532,9 +545,9 @@ void eval_dispatch() {
 
     case EV_DEFINITION:
       display_registers("EV_DEFINITION");
-      unev = CADR(expr);
+      unev = cadr(expr);
       push(unev);
-      expr = CADDR(expr);
+      expr = caddr(expr);
       push(env);
       push(cont);
       cont = EV_DEFINITION_1;
@@ -552,8 +565,8 @@ void eval_dispatch() {
 
     case EV_LAMBDA:
       display_registers("EV_LAMBDA");
-      unev = CADR(expr);        /* parameters */
-      expr = CDDR(expr);        /* body */
+      unev = cadr(expr);        /* parameters */
+      expr = cddr(expr);        /* body */
       val = mkproc(unev, expr, env);
       label = cont;
       continue;
@@ -566,9 +579,9 @@ void eval_dispatch() {
       display_registers("EV_APPLICATION");
       push(cont);
       push(env);
-      unev = CDR(expr);
+      unev = cdr(expr);
       push(unev);
-      expr = CAR(expr);
+      expr = car(expr);
       cont = EV_APPL_DID_OPERATOR;
       label = EVAL_DISPATCH;
       continue;

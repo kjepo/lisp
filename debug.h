@@ -7,8 +7,8 @@ void display2(Obj expr, int dotted) {
     else {
       if (!dotted)
 	printf("(");
-      display(CAR(expr));
-      if (CDR(expr) != 0) {
+      display(car(expr));
+      if (cdr(expr) != 0) {
 	printf(" ");
 	if (objtype(thecdrs[expr]) != PAIR_TAG)
 	  printf(". ");
@@ -27,18 +27,18 @@ void display2(Obj expr, int dotted) {
   case PROC_TAG:
     //    printf("<procedure %d>", objval(expr));
     printf("<");
-    if (expr && CAR(objval(expr)))
-      display(CAR(objval(expr)));
+    if (expr && car(objval(expr)))
+      display(car(objval(expr)));
     else
       printf("NULL");
     printf(",");
-    if (expr && CDR(objval(expr)) && CADR(objval(expr)))
-      display(CADR(objval(expr)));
+    if (expr && cdr(objval(expr)) && cadr(objval(expr)))
+      display(cadr(objval(expr)));
     else
       printf("NULL");
     printf(",env");
     /*
-    if (expr && CDR(objval(expr)) && CDDR(objval(expr)) && CADDR(objval(expr)))
+    if (expr && cdr(objval(expr)) && CDDR(objval(expr)) && CADDR(objval(expr)))
       display(CADDR(objval(expr)));
     else
       printf("NULL");
@@ -113,12 +113,12 @@ void dump_memory2(int from, int to) {
     printf("%d:\t", i);
   }
   printf("\n");
-  printf("CARS: ");
+  printf("carS: ");
   for (i = from; i <= to; i++) {
-    dumpval(CAR(i));
+    dumpval(car(i));
     printf("\t");
   }
-  printf("\nCDRS: ");
+  printf("\ncdrS: ");
   for (i = from; i <= to; i++) {
     dumpval(thecdrs[i]);
     printf("\t");
@@ -130,7 +130,7 @@ void dump_memory() {
   printf("env = %d\n", (int) env);
   int i, last;
   for (last = MEMSIZE; last >= 0; last--)
-    if (CAR(last))
+    if (car(last))
       break;
   for (i = 0; i < last; i+= 12) {
     dump_memory2(i, i+12);
