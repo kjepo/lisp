@@ -1,17 +1,12 @@
 /*
- * this changes global x
- *
- * (lambda (x) x) 3)
- *
  * For --load filename.scm 
  *
  * lisp should add ".scm" if it isn't provided 
  * after reading filename.scm it should continue reading from stdin
  *
- * Ignore extra ')' when parsing
+ * Implement '(a b c) to work as (quote (a b c))
  *
  */
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -67,7 +62,7 @@ void unbound(Obj id) {
 
 Obj thecars[MEMSIZE];
 Obj thecdrs[MEMSIZE];
-Obj free_index = 1;		       // can't start at 0 because 0 means NIL
+Obj free_index = 1;                    // can't start at 0 because 0 means NIL
 
 Obj NIL = 0;
 
@@ -83,7 +78,7 @@ Obj mknum(int n) { return n | (NUM_TAG << 29); }
 Obj mksym(char *id) { return lookup(id) | (SYMBOL_TAG << 29); }
 Obj mkbool(char *id) { return lookup(id) | (BOOL_TAG << 29); }
 
-Obj cons(Obj car_, Obj cdr_) {	/* aka mkpair */
+Obj cons(Obj car_, Obj cdr_) {  /* aka mkpair */
   if (free_index > MEMSIZE)
       error("Error: memory full!");
   CAR(free_index) = car_;
@@ -105,7 +100,7 @@ Obj adjoin_arg(Obj arg, Obj arglist) {
 
 Obj mkproc(Obj parameters, Obj body, Obj env) {
   /* a procedure is a triple (parameters body env) */
-  Obj p = cons(parameters, cons(body, cons(env, 0)));
+  Obj p = cons(parameters, cons(body, cons(env, NIL)));
   return objval(p) | (PROC_TAG << 29);
   //  return p;
 }
@@ -121,34 +116,32 @@ Obj mkprim(Primitive p) {
   return p | (PRIM_TAG << 29);
 }
 
-
-
 Obj TRUE_SYM, IF_SYM, EQ_SYM, LET_SYM, ADD_SYM, SUB_SYM,
   MUL_SYM, DIV_SYM, DEFINE_SYM, CAR_SYM, CDR_SYM, CONS_SYM, ATOM_SYM,
   QUOTE_SYM, LETREC_SYM, LAMBDA_SYM, SETBANG_SYM;
 
 typedef enum {
-  PRINT_RESULT,			/* 0 */
+  PRINT_RESULT,                 /* 0 */
   EV_IF_DECIDE,
   EV_IF_CONSEQUENT,
   EV_IF_ALTERNATIVE,
-  EV_ASSIGNMENT_1,		
-  EV_DEFINITION_1,		
-  EV_APPL_DID_OPERATOR,		
-  EV_APPL_ACCUMULATE_ARG,	
-  EV_APPL_ACCUM_LAST_ARG, 	
-  EV_SEQUENCE_CONTINUE,		
-  EVAL_DISPATCH,		/* 10 */
-  EV_SELF_EVAL,			
-  EV_VARIABLE,			
-  EV_QUOTED,			
-  EV_IF,			
-  EV_ASSIGNMENT,		
-  EV_DEFINITION,		
-  EV_LAMBDA,			
+  EV_ASSIGNMENT_1,              
+  EV_DEFINITION_1,              
+  EV_APPL_DID_OPERATOR,         
+  EV_APPL_ACCUMULATE_ARG,       
+  EV_APPL_ACCUM_LAST_ARG,       
+  EV_SEQUENCE_CONTINUE,         
+  EVAL_DISPATCH,                /* 10 */
+  EV_SELF_EVAL,                 
+  EV_VARIABLE,                  
+  EV_QUOTED,                    
+  EV_IF,                        
+  EV_ASSIGNMENT,                
+  EV_DEFINITION,                
+  EV_LAMBDA,                    
   EV_BEGIN,
   EV_APPLICATION,
-  EV_APPL_OPERAND_LOOP,		/* 20 */
+  EV_APPL_OPERAND_LOOP,         /* 20 */
   EV_APPL_LAST_ARG,
   EV_SEQUENCE,
   EV_SEQUENCE_LAST_EXP,
@@ -156,7 +149,7 @@ typedef enum {
   PRIMITIVE_APPLY,
   COMPOUND_APPLY,
   UNKNOWN_PROCEDURE_TYPE,  
-  UNKNOWN_EXPRESSION_TYPE	/* 28 */
+  UNKNOWN_EXPRESSION_TYPE       /* 28 */
 } Continuation;
 
 char *continuation_string[] = {
@@ -203,8 +196,7 @@ Obj pairup(Obj vars, Obj vals) {
     return NIL;
   else
     return cons(cons(CAR(vars), CAR(vals)),
-		pairup(CDR(vars), CDR(vals)));
-    //    return cons(cons(CAR(vars), cons(CAR(vals), NIL)), pairup(CDR(vars), CDR(vals)));
+                pairup(CDR(vars), CDR(vals)));
 }
 
 Obj bind(Obj vars, Obj vals, Obj env) {
@@ -223,42 +215,41 @@ void prepend(Obj x, Obj l) {
 }
 
 void add_binding(Obj var, Obj val, Obj env) {
-  //  Obj v = cons(var, cons(val, 0));
   Obj v = cons(var, val);
   prepend(v, env);
 }
 
 // find the first pair in env whose car equals var and return that pair (or NIL, if not found)
 Obj assoc(Obj var, Obj env) {
-  if (env == 0)
-    return 0;
+  if (env == NIL)
+    return NIL;
   else if (CAR(CAR(env)) == var)
     return CAR(env);
   else
     return assoc(var, CDR(env));
 }
 
-Obj env_lookup(Obj var, Obj env) {	/* env[var] */
+Obj env_lookup(Obj var, Obj env) {      /* env[var] */
   Obj pair = assoc(var, env);
-  if (pair == 0) {
+  if (pair == NIL) {
     unbound(var);
-    return 0;
+    return NIL;
   } else
     return CDR(pair);
 }
 
 void set_variable_value(Obj var, Obj val, Obj env) {
   Obj pair = assoc(var, env);
-  if (pair == 0)
+  if (pair == NIL)
     unbound(var);
   else
-    thecdrs[pair] = val;
+    CDR(pair) = val;
 }
 
 void define_variable(Obj var, Obj val, Obj env) {
   Obj pair = assoc(var, env);
-  if (pair != 0)
-    CDR(pair) = val;		/* overwrite old definition */
+  if (pair != NIL)
+    CDR(pair) = val;            /* overwrite old definition */
   else
     add_binding(var, val, env);
 }
@@ -309,7 +300,7 @@ Obj primitive_procedures;
 void init_env() {
   // an environment BINDING id -> value is represented simply as cons(id, value)
   // an ENVIRONMENT is a list of bindings ( ( id . value ) ( id . value ) .... )
-  primitive_procedures = 0;
+  primitive_procedures = NIL;
   primitive_procedures = bind1(mksym("#f"), False, primitive_procedures);
   primitive_procedures = bind1(mksym("#t"), True, primitive_procedures);
   primitive_procedures = bind1(mksym("x"), mknum(8), primitive_procedures);
@@ -360,25 +351,25 @@ void eval_dispatch() {
       env = pop();
       argl = NIL;
       proc = val;
-      if (unev == NIL)		/* no operands */
-	label = APPLY_DISPATCH;
+      if (unev == NIL)          /* no operands */
+        label = APPLY_DISPATCH;
       else {
-	push(proc);
-	label = EV_APPL_OPERAND_LOOP;
+        push(proc);
+        label = EV_APPL_OPERAND_LOOP;
       }
       continue;
 
     case EV_APPL_OPERAND_LOOP:
       display_registers("EV_APPL_OPERAND_LOOP");
       push(argl);
-      expr = CAR(unev);		/* 1st operand */
-      if (!CDR(unev)) {		/* last operand */
-	label = EV_APPL_LAST_ARG;
+      expr = CAR(unev);         /* 1st operand */
+      if (!CDR(unev)) {         /* last operand */
+        label = EV_APPL_LAST_ARG;
       } else {
-	push(env);
-	push(unev);
-	cont = EV_APPL_ACCUMULATE_ARG;
-	label = EVAL_DISPATCH;
+        push(env);
+        push(unev);
+        cont = EV_APPL_ACCUMULATE_ARG;
+        label = EVAL_DISPATCH;
       }
       continue;
 
@@ -391,11 +382,11 @@ void eval_dispatch() {
     case APPLY_DISPATCH:
       display_registers("APPLY_DISPATCH");
       if (is_primitive(proc))
-	label = PRIMITIVE_APPLY;
+        label = PRIMITIVE_APPLY;
       else if (is_compound(proc))
-	label = COMPOUND_APPLY;
+        label = COMPOUND_APPLY;
       else
-	label = UNKNOWN_PROCEDURE_TYPE;
+        label = UNKNOWN_PROCEDURE_TYPE;
       continue;
 
     case PRIMITIVE_APPLY:
@@ -408,7 +399,7 @@ void eval_dispatch() {
 
     case COMPOUND_APPLY:
       display_registers("COMPOUND_APPLY");
-      unev = CAR(objval(proc));	     /* procedure parameters */
+      unev = CAR(objval(proc));      /* procedure parameters */
       env = CADDR(objval(proc));     /* procedure environment */
       env = bind(unev, argl, env);
       unev = CADR(objval(proc));     /* procedure body */
@@ -417,14 +408,14 @@ void eval_dispatch() {
 
     case EV_SEQUENCE:
       display_registers("EV_SEQUENCE");
-      expr = CAR(unev);		/* first expression */
-      if (!CDR(unev))		/* last expression */
-	label = EV_SEQUENCE_LAST_EXP;
+      expr = CAR(unev);         /* first expression */
+      if (!CDR(unev))           /* last expression */
+        label = EV_SEQUENCE_LAST_EXP;
       else {
-	push(unev);
-	push(env);
-	cont = EV_SEQUENCE_CONTINUE;
-	label = EVAL_DISPATCH;
+        push(unev);
+        push(env);
+        cont = EV_SEQUENCE_CONTINUE;
+        label = EVAL_DISPATCH;
       }
       continue;
 
@@ -456,7 +447,7 @@ void eval_dispatch() {
       env = pop();
       argl = pop();
       argl = adjoin_arg(val, argl);
-      unev = CDR(unev);		/* rest operands */
+      unev = CDR(unev);         /* rest operands */
       label = EV_APPL_OPERAND_LOOP;
       continue;
 
@@ -488,11 +479,11 @@ void eval_dispatch() {
 
     case EV_IF:
       display_registers("EV_IF");
-      push(expr);		/* save expression for later */
+      push(expr);               /* save expression for later */
       push(env);
       push(cont);
       cont = EV_IF_DECIDE;
-      expr = CADR(expr);	/* if-predicate */
+      expr = CADR(expr);        /* if-predicate */
       label = EVAL_DISPATCH;
       continue;
 
@@ -506,22 +497,22 @@ void eval_dispatch() {
 
     case EV_IF_CONSEQUENT:
       display_registers("EV_IF_CONSEQUENT");
-      expr = CADDR(expr);	/* if-consequent */
+      expr = CADDR(expr);       /* if-consequent */
       label = EVAL_DISPATCH;
       continue;
 
     case EV_IF_ALTERNATIVE:
       display_registers("EV_IF_ALTERNATIVE");
       if (CDDDR(expr))
-	expr = CADDDR(expr);
+        expr = CADDDR(expr);
       else
-	expr = NIL;
+        expr = NIL;
       label = EVAL_DISPATCH;
       continue;
 
     case EV_ASSIGNMENT:
       display_registers("EV_ASSIGNMENT");
-      unev = CADR(expr);	/* assignment variable */
+      unev = CADR(expr);        /* assignment variable */
       push(unev);
       expr = CADDR(expr); /* assignment value */
       push(env);
@@ -561,8 +552,8 @@ void eval_dispatch() {
 
     case EV_LAMBDA:
       display_registers("EV_LAMBDA");
-      unev = CADR(expr); 	/* parameters */
-      expr = CDDR(expr);	/* body */
+      unev = CADR(expr);        /* parameters */
+      expr = CDDR(expr);        /* body */
       val = mkproc(unev, expr, env);
       label = cont;
       continue;
@@ -596,25 +587,25 @@ void eval_dispatch() {
     case EVAL_DISPATCH:
       display_registers("EVAL_DISPATCH");
       if (is_self_evaluating()) {
-	label = EV_SELF_EVAL;
+        label = EV_SELF_EVAL;
       } else if (is_variable()) {
-	label = EV_VARIABLE;
+        label = EV_VARIABLE;
       } else if (is_quote()) {
-	label = EV_QUOTED;
+        label = EV_QUOTED;
       } else if (is_if()) {
-	label = EV_IF;
+        label = EV_IF;
       } else if (is_assignment()) {
-	label = EV_ASSIGNMENT;
+        label = EV_ASSIGNMENT;
       } else if (is_definition()) {
-	label = EV_DEFINITION;
+        label = EV_DEFINITION;
       } else if (is_lambda()) {
-	label = EV_LAMBDA;
+        label = EV_LAMBDA;
       } else if (is_begin()) {
-	label = EV_BEGIN;
+        label = EV_BEGIN;
       } else if (is_application()) {
-	label = EV_APPLICATION;
+        label = EV_APPLICATION;
       } else {
-	label = UNKNOWN_EXPRESSION_TYPE;
+        label = UNKNOWN_EXPRESSION_TYPE;
       }
       continue;
     default:
@@ -662,7 +653,7 @@ Token scan2() {
       char *p = id;
       *p++ = ch;
       while ((ch = fgetc(fp)) && legal_symbol_rest(ch))
-	*p++ = ch;
+        *p++ = ch;
       ungetc(ch, fp);
       *p = 0;
       return token = ID;
@@ -729,7 +720,7 @@ Obj parse2() {
   return parse3(parse());
 }
 
-Obj parse() {			/* recursive-descent parser */
+Obj parse() {                   /* recursive-descent parser */
   while (token == RPAR)
     scan();
   if (token == ID || token == NUM)
@@ -760,19 +751,19 @@ int main(int argc, char *argv[]) {
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] == '-') {
       if (!strncmp(argv[i], "--load", 6)) {
-	if (!(fp = fopen(argv[i+1], "r"))) {
-	  fprintf(stderr, "%s: could not open %s\n", argv[0], argv[i+1]);
-	  exit(1);
-	} else {
-	  printf("reading from %s\n", argv[i+1]);
-	  rep();
-	  fp = stdin;
-	}
+        if (!(fp = fopen(argv[i+1], "r"))) {
+          fprintf(stderr, "%s: could not open %s\n", argv[0], argv[i+1]);
+          exit(1);
+        } else {
+          printf("reading from %s\n", argv[i+1]);
+          rep();
+          fp = stdin;
+        }
       } else if (argv[i][1] == 'v') {
-	verbose = 1;
+        verbose = 1;
       } else {
-	fprintf(stderr, "usage: %s [-v] [--load filename]\n", argv[0]);
-	exit(1);
+        fprintf(stderr, "usage: %s [-v] [--load filename]\n", argv[0]);
+        exit(1);
       }
     }
   }
