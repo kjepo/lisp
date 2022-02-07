@@ -105,26 +105,35 @@ void dumpval(Obj n) {
   }
 }
 
-void dump_memory() {
-  int i, last;
-  for (last = MEMSIZE; last >= 0; last--)
-    if (CAR(last))
-      break;
 
+void dump_memory2(int from, int to) {
+  int i; 
   printf("      ");
-  for (i = 1; i <= last; i++) {
+  for (i = from; i <= to; i++) {
     printf("%d:\t", i);
   }
   printf("\n");
   printf("CARS: ");
-  for (i = 1; i <= last; i++) {
+  for (i = from; i <= to; i++) {
     dumpval(CAR(i));
     printf("\t");
   }
   printf("\nCDRS: ");
-  for (i = 1; i <= last; i++) {
+  for (i = from; i <= to; i++) {
     dumpval(thecdrs[i]);
     printf("\t");
   }
   printf("\n");
+}
+
+void dump_memory() {
+  printf("env = %d\n", (int) env);
+  int i, last;
+  for (last = MEMSIZE; last >= 0; last--)
+    if (CAR(last))
+      break;
+  for (i = 0; i < last; i+= 12) {
+    dump_memory2(i, i+12);
+    //    NL;
+  }
 }

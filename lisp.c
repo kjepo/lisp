@@ -228,13 +228,6 @@ void add_binding(Obj var, Obj val, Obj env) {
   prepend(v, env);
 }
 
-/*
-// env[var->value]
-void add_binding(Obj var, Obj value, Obj env0) {
-  env = bind(var, value, env0);
-}
-*/
-
 // find the first pair in env whose car equals var and return that pair (or NIL, if not found)
 Obj assoc(Obj var, Obj env) {
   if (env == 0)
@@ -282,8 +275,7 @@ Obj pop() {
   return Stack[--StackPtr];
 }
 
-
-void init() {
+void init_symbols() {
   False = mkbool("#f");
   True = mkbool("#t");
 
@@ -310,6 +302,22 @@ void init() {
   argl = NIL;
   proc = NIL;
   StackPtr = 0;
+}
+
+Obj primitive_procedures;
+
+void init_env() {
+  // an environment BINDING id -> value is represented simply as cons(id, value)
+  // an ENVIRONMENT is a list of bindings ( ( id . value ) ( id . value ) .... )
+  primitive_procedures = 0;
+  primitive_procedures = bind1(mksym("#f"), False, primitive_procedures);
+  primitive_procedures = bind1(mksym("#t"), True, primitive_procedures);
+  primitive_procedures = bind1(mksym("x"), mknum(8), primitive_procedures);
+  primitive_procedures = bind1(mksym("y"), mknum(7), primitive_procedures);
+  primitive_procedures = bind1(mksym("car"), mkprim(PRIM_CAR), primitive_procedures);
+  primitive_procedures = bind1(mksym("cdr"), mkprim(PRIM_CDR), primitive_procedures);
+  primitive_procedures = bind1(mksym("cons"), mkprim(PRIM_CONS), primitive_procedures);
+  primitive_procedures = bind1(mksym("pair?"), mkprim(PRIM_PAIRP), primitive_procedures);
 }
 
 // problem is mk_proc creates a list and adds a tag which is not a pair that CAR/CDR works on
@@ -352,7 +360,6 @@ void eval_dispatch() {
       env = pop();
       argl = NIL;
       proc = val;
-      display_registers("EV_APPL_DID_OPERATOR [2]");      
       if (unev == NIL)		/* no operands */
 	label = APPLY_DISPATCH;
       else {
@@ -401,7 +408,6 @@ void eval_dispatch() {
 
     case COMPOUND_APPLY:
       display_registers("COMPOUND_APPLY");
-      printf("proc: "); display(proc); NL; dump_memory(); NL;
       unev = CAR(objval(proc));	     /* procedure parameters */
       env = CADDR(objval(proc));     /* procedure environment */
       env = bind(unev, argl, env);
@@ -420,7 +426,6 @@ void eval_dispatch() {
 	cont = EV_SEQUENCE_CONTINUE;
 	label = EVAL_DISPATCH;
       }
-      display_registers("EV_SEQUENCE [exit]");      
       continue;
 
     case EV_SEQUENCE_LAST_EXP:
@@ -460,7 +465,6 @@ void eval_dispatch() {
       argl = pop();
       argl = adjoin_arg(val, argl);
       proc = pop();
-      display_registers("EV_APPL_ACCUMULATE_LAST_ARG [exit]");
       label = APPLY_DISPATCH;
       continue;
 
@@ -551,7 +555,6 @@ void eval_dispatch() {
       cont = pop();
       env = pop();
       unev = pop();
-      display_registers("EV_DEFINITION_1 [2]");      
       define_variable(unev, val, env);
       label = cont;
       continue;
@@ -619,21 +622,6 @@ void eval_dispatch() {
       exit(1);
     }
   }
-}
-
-void setup_environment() {
-  // an environment BINDING id -> value is represented simply as cons(id, value)
-  // an ENVIRONMENT is a list of bindings ( ( id . value ) ( id . value ) .... )
-
-  env = 0;
-  env = bind1(mksym("#f"), False, env);
-  env = bind1(mksym("#t"), True, env);
-  env = bind1(mksym("x"), mknum(8), env);
-  env = bind1(mksym("y"), mknum(7), env);
-  env = bind1(mksym("car"), mkprim(PRIM_CAR), env);
-  env = bind1(mksym("cdr"), mkprim(PRIM_CDR), env);
-  env = bind1(mksym("cons"), mkprim(PRIM_CONS), env);
-  env = bind1(mksym("pair?"), mkprim(PRIM_PAIRP), env);
 }
 
 void eval() {
@@ -742,14 +730,14 @@ Obj parse2() {
 }
 
 Obj parse() {			/* recursive-descent parser */
+  while (token == RPAR)
+    scan();
   if (token == ID || token == NUM)
     return parse_atom();
   else if (token == LPAR) {
     scan();
     return parse2();
-  } else if (token == RPAR) 
-    scan();
-  else if (token == END)
+  } else if (token == END)
     return 0;
   else
     error("expected number, symbol, or '('.");
@@ -757,16 +745,17 @@ Obj parse() {			/* recursive-descent parser */
 }
 
 void rep() {
+  init_symbols();
   scan();
-  while ((expr = parse()))
+  init_env();
+  while ((expr = parse())) {
+    env = primitive_procedures;
     eval();
+  }
 }
 
 int main(int argc, char *argv[]) {
   fp = stdin;
-
-  init();
-  setup_environment();
 
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] == '-') {
