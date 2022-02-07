@@ -1,3 +1,4 @@
+
 /*
  * For --load filename.scm 
  *
@@ -22,8 +23,6 @@ int verbose = 0;
 void error(char *s)   { printf("%s\n", s); exit(1); }
 void verify(int test) { assert(test); printf("OK!\n"); }
 
-FILE *fp;
-
 void display(Obj);
 void display2(Obj, int);
 
@@ -47,7 +46,7 @@ void display2(Obj, int);
 #define ARRAY_TAG  7
 
 int objval(Obj n) {
-  return n & (0x1fff);
+  return n & (0x1fffffff);
 }
 
 int objtype(Obj n) {
@@ -123,7 +122,7 @@ Obj mkprim(Primitive p) {
 
 Obj TRUE_SYM, IF_SYM, EQ_SYM, LET_SYM, ADD_SYM, SUB_SYM,
   MUL_SYM, DIV_SYM, DEFINE_SYM, CAR_SYM, CDR_SYM, CONS_SYM, ATOM_SYM,
-  QUOTE_SYM, LETREC_SYM, LAMBDA_SYM, SETBANG_SYM;
+  QUOTE_SYM, LETREC_SYM, LAMBDA_SYM, SETBANG_SYM, BEGIN_SYM;
 
 typedef enum {
   PRINT_RESULT,                 /* 0 */
@@ -292,6 +291,7 @@ void init_symbols() {
   DEFINE_SYM = mksym("define");
   LAMBDA_SYM = mksym("lambda");
   SETBANG_SYM = mksym("set!");
+  BEGIN_SYM = mksym("begin");
   cont = EVAL_DISPATCH;
   val = NIL;
   unev = NIL;
@@ -330,7 +330,7 @@ int is_if()              { return PAIR_TAG == objtype(expr) && IF_SYM == car(exp
 int is_assignment()      { return PAIR_TAG == objtype(expr) && SETBANG_SYM == car(expr); }
 int is_definition()      { return PAIR_TAG == objtype(expr) && DEFINE_SYM == car(expr); }
 int is_lambda()          { return PAIR_TAG == objtype(expr) && LAMBDA_SYM == car(expr); }
-int is_begin()           { return 0; }
+int is_begin()           { return PAIR_TAG == objtype(expr) && BEGIN_SYM == car(expr); }
 int is_application()     { return PAIR_TAG == objtype(expr); }
 int is_primitive(Obj p)  { return PRIM_TAG == objtype(p); }
 int is_compound(Obj p)   { return PROC_TAG == objtype(p); }
@@ -573,7 +573,10 @@ void eval_dispatch() {
 
     case EV_BEGIN:
       display_registers("EV_BEGIN");
-      error("NYI");
+      unev = cdr(expr);
+      push(cont);
+      label = EV_SEQUENCE;
+      continue;
 
     case EV_APPLICATION:
       display_registers("EV_APPLICATION");
@@ -634,22 +637,35 @@ void eval() {
 }
 
 // scanner and parser for LISP-style input
-typedef enum toktype { END, ID, NUM, LPAR = '(', RPAR = ')', DOT = '.' } Token;
-Token token;  // current token
-char id[80];    // string value when token == ID
-int nval;       // numeric value when token == NUM
+typedef enum toktype { END, ID, NUM, LPAR = '(', RPAR = ')', DOT = '.', SEMI = ';' } Token;
+Token token;                    // current token
+char id[80];                    // string value when token == ID
+int nval;                       // numeric value when token == NUM
 
 int legal_symbol_start(char ch) { return isalpha(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }   
 int legal_symbol_rest(char ch) { return isalnum(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }   
 
+FILE *fp;
+
 Token scan2() {
   char ch;
-  do {                     // skip whitespace
+
+ start_scan:
+
+  do {                          /* skip whitespace */
     if (EOF == (ch = fgetc(fp)))
       return token = END;
   } while (isspace(ch));
 
-  switch (ch) {
+  if (ch == SEMI) {             /* ; means comment until end-of-line */
+    do {
+      if (EOF == (ch = fgetc(fp)))
+        return token = END;
+    } while (ch != '\n');
+    goto start_scan;
+  }
+
+  switch (ch) {                 /* ch is not ";", whitespace or EOF */
   case LPAR:
     return token = LPAR;
   case RPAR:
@@ -749,9 +765,7 @@ Obj parse() {                   /* recursive-descent parser */
 }
 
 void rep() {
-  init_symbols();
   scan();
-  init_env();
   while ((expr = parse())) {
     env = primitive_procedures;
     eval();
@@ -759,6 +773,9 @@ void rep() {
 }
 
 int main(int argc, char *argv[]) {
+
+  init_symbols();
+  init_env();
   fp = stdin;
 
   for (int i = 1; i < argc; i++) {
@@ -787,13 +804,12 @@ int main(int argc, char *argv[]) {
   printf("%s\n", input);
   */
 
-
   rep();
 
-  if (verbose)
+  if (verbose) {
     dump_memory();
-  printf("env: "); display(env); NL;
-  if (verbose)
+    printf("env: "); display(env); NL;
     dump_hashtab();
+  }
 
 }
