@@ -58,7 +58,7 @@ void printBits(size_t const size, void const * const ptr);
 int objval(Obj n) {
   int c = n & 0x1fffffff;  
   if (objtype(n) == NUM_TAG)
-    if (n & 0x10000000) {	/* a negative number (2's complement) */
+    if (n & 0x10000000) {       /* a negative number (2's complement) */
       return c | 0xe0000000;
     }
   return c;
@@ -790,7 +790,7 @@ Obj parse2() {
 
 
 Obj parse() {                   /* recursive-descent parser */
-  while (token == RPAR)		/* accept extra ')' for conveniene */
+  while (token == RPAR)         /* accept extra ')' for conveniene */
     scan();
   if (token == ID || token == NUM)
     return parse_atom();
