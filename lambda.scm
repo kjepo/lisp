@@ -22,7 +22,13 @@ x
 (begin (define u 42) (set! u 99) u)
 
 ;;; zero? returns #t if x is zero, #f otherwise
-(define zero? (lambda (x) (= x 0)))
+(define zero?
+  (lambda (n)
+    (= n 0)))
+
+(define -1+
+  (lambda (n)
+    (+ n -1)))
 
 ;;; recursive factorial function
 ;;; this lisp interpreter can compute up to 12!
@@ -30,8 +36,6 @@ x
   (lambda (n)
     (if (zero? n)
 	1
-	(* n (fact (- n 1))))))
+	(* n (fact (-1+ n))))))
 
-(fact 12)
-
-;;; EOF
+(fact 10)
