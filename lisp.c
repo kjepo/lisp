@@ -7,6 +7,8 @@
  *
  * Implement '(a b c) to work as (quote (a b c))
  *
+ * Replace magic numbers in objval and mknum in terms of NUM_TAG
+ *
  */
 
 #include <stdio.h>
@@ -26,7 +28,8 @@ void verify(int test) { assert(test); printf("OK!\n"); }
 void display(Obj);
 void display2(Obj, int);
 
-// Objects are tagged with 3 most significant bits
+// Objects are tagged with 3 most significant bits xxx
+// xxx11111 11111111 11111111 11111111
 // number      000bbbbbb ... bbbbbbbb
 // symbol      001bbbbbb ... bbbbbbbb
 // pair        010bbbbbb ... bbbbbbbb
@@ -36,6 +39,7 @@ void display2(Obj, int);
 // boolean     110bbbbbb ... bbbbbbbb
 // array       111
 
+// some of these numbers should not be changed, in particular PAIR_TAG and NUM_TAG
 #define PAIR_TAG   0
 #define SYMBOL_TAG 1
 #define NUM_TAG    2
@@ -45,12 +49,19 @@ void display2(Obj, int);
 #define BOOL_TAG   6
 #define ARRAY_TAG  7
 
-int objval(Obj n) {
-  return n & (0x1fffffff);
-}
-
 int objtype(Obj n) {
   return (n >> 29) & 0x7;
+}
+
+void printBits(size_t const size, void const * const ptr);
+
+int objval(Obj n) {
+  int c = n & 0x1fffffff;  
+  if (objtype(n) == NUM_TAG)
+    if (n & 0x10000000) {	/* a negative number (2's complement) */
+      return c | 0xe0000000;
+    }
+  return c;
 }
 
 void unbound(Obj id) {
@@ -73,7 +84,11 @@ Obj NIL = 0;
 #define caddr(p) (car(cdr(cdr(p))))
 #define cadddr(p) (car(cdr(cdr(cdr(p)))))
 
-Obj mknum(int n) { return n | (NUM_TAG << 29); }
+Obj mknum(int n) {
+  return (n & 0x1fffffff) | (NUM_TAG << 29);
+}
+
+//Obj mknum(int n) { return objval(n) | (NUM_TAG << 29); }
 Obj mksym(char *id) { return lookup(id) | (SYMBOL_TAG << 29); }
 Obj mkbool(char *id) { return lookup(id) | (BOOL_TAG << 29); }
 
@@ -101,20 +116,11 @@ Obj mkproc(Obj parameters, Obj body, Obj env) {
   /* a procedure is a triple (parameters body env) */
   Obj p = cons(parameters, cons(body, cons(env, NIL)));
   return objval(p) | (PROC_TAG << 29);
-  //  return p;
 }
 
 typedef enum {
-  PRIM_CAR,
-  PRIM_CDR,
-  PRIM_CONS,
-  PRIM_PAIRP,
-  PRIM_PLUS,
-  PRIM_MINUS,
-  PRIM_TIMES,
-  PRIM_EQ,
-  
-} Primitive;
+  PRIM_CAR,  PRIM_CDR,  PRIM_CONS,  PRIM_PAIRP,  PRIM_PLUS,  PRIM_MINUS,  PRIM_TIMES,  PRIM_EQ,
+  PRIM_LT,  PRIM_GT, PRIM_DISPLAY } Primitive;
 
 Obj mkprim(Primitive p) {
   return p | (PRIM_TAG << 29);
@@ -318,6 +324,9 @@ void init_env() {
   primitive_procedures = bind1(mksym("-"), mkprim(PRIM_MINUS), primitive_procedures);
   primitive_procedures = bind1(mksym("*"), mkprim(PRIM_TIMES), primitive_procedures);
   primitive_procedures = bind1(mksym("="), mkprim(PRIM_EQ), primitive_procedures);
+  primitive_procedures = bind1(mksym("<"), mkprim(PRIM_LT), primitive_procedures);
+  primitive_procedures = bind1(mksym(">"), mkprim(PRIM_GT), primitive_procedures);
+  primitive_procedures = bind1(mksym("display"), mkprim(PRIM_DISPLAY), primitive_procedures);
 }
 
 // problem is mk_proc creates a list and adds a tag which is not a pair that CAR/CDR works on
@@ -346,9 +355,13 @@ void prim_plus()  { val = mknum(objval(car(argl)) + objval(cadr(argl))); }
 void prim_minus() { val = mknum(objval(car(argl)) - objval(cadr(argl))); }
 void prim_times() { val = mknum(objval(car(argl)) * objval(cadr(argl))); }
 void prim_eq()    { val = (car(argl) == cadr(argl) ? True : False); }
+void prim_lt()    { val = (objval(car(argl)) < objval(cadr(argl)) ? True : False); }
+void prim_gt()    { val = (objval(car(argl)) > objval(cadr(argl)) ? True : False); }
+void prim_display() { display(car(argl)); printf(" "); }
 
-void (*primitives[])() = { prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq };
-
+void (*primitives[])() = {
+  prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq, prim_lt,
+  prim_gt, prim_display };
 
 #include "debug.h"
 
@@ -357,7 +370,6 @@ void eval_dispatch() {
   cont = PRINT_RESULT;
   for (;;) {
     switch (label) {
-
     case EV_APPL_DID_OPERATOR:
       display_registers("EV_APPL_DID_OPERATOR");
       unev = pop();
@@ -637,7 +649,10 @@ void eval() {
 }
 
 // scanner and parser for LISP-style input
-typedef enum toktype { END, ID, NUM, LPAR = '(', RPAR = ')', DOT = '.', SEMI = ';' } Token;
+typedef enum toktype {
+  END, ID, NUM, LPAR = '(', RPAR = ')', DOT = '.', SEMI = ';', PLUS = '+', MINUS = '-'
+} Token;
+
 Token token;                    // current token
 char id[80];                    // string value when token == ID
 int nval;                       // numeric value when token == NUM
@@ -648,7 +663,7 @@ int legal_symbol_rest(char ch) { return isalnum(ch) || strchr("#+-.*/<=>!?:$%_&~
 FILE *fp;
 
 Token scan2() {
-  char ch;
+  char ch, sgn;
 
  start_scan:
 
@@ -693,16 +708,37 @@ Token scan2() {
   return token = END;
 }
 
-Token scan() {
+// a number is an optional + or - followed by at least one or more digits
+// these are numbers: 1, -1, +1, -12, 
+// these are not considered numbers: -, -1x, +, ++
+
+int isnumberl(char *s) {
+  if (strlen(s) > 1 && (*s == '-' || *s == '+'))
+    s++;
+  while (*s && isdigit(*s))
+    s++;
+  return *s == 0;
+}
+
+void scan() {
   Token t = scan2();
-  return t;
-  printf("got token %d ", t);
-  if (t == ID)
+  if (t == ID && isnumberl(id)) {
+    t = NUM;
+    sscanf(id, "%d", &nval);
+  }
+  token = t;
+  return;
+
+  if (t == ID) {
+    printf("got ID ");
     printf("(%s)", id);
-  if (t == NUM)
+  } else if (t == NUM) {
+    printf("got NUM ");
     printf("(%d)", nval);
+  } else
+    printf("got token %d", t);
   NL;
-  return t;
+  token = t;
 }
 
 
@@ -716,12 +752,13 @@ void expect(Token tok, char *msg) {
 Obj parse_atom() {
   Obj x;
   char *p;
-  if (token == ID)
+  if (token == ID) {
     x = mksym(id);
-  else if (token == NUM)
+  } else if (token == NUM) {
     x = mknum(nval);
-  else
+  } else {
     error("expected number or symbol.");
+  }
   scan();
   return x;
 }
@@ -749,8 +786,11 @@ Obj parse2() {
   return parse3(parse());
 }
 
+// sexp --> ID | NUM | "(" sexp ")" | "(" sexp "." sexp ")"
+
+
 Obj parse() {                   /* recursive-descent parser */
-  while (token == RPAR)
+  while (token == RPAR)		/* accept extra ')' for conveniene */
     scan();
   if (token == ID || token == NUM)
     return parse_atom();
@@ -811,5 +851,4 @@ int main(int argc, char *argv[]) {
     printf("env: "); display(env); NL;
     dump_hashtab();
   }
-
 }
