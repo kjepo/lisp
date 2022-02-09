@@ -39,3 +39,20 @@ x
 	(* n (fact (-1+ n))))))
 
 (fact 10)
+
+(list 1 2 3)
+(list (* 3 3) (* 4 4))
+; (list 'a 1 '(3 1 4))
+
+'a
+(car '(1 2 3))
+(define empty-list '())
+empty-list
+(cons 1 empty-list)
+
+(number? 1)
+(number? 'a)
+(number? (list 1 2 3))
+(symbol? 1)
+(symbol? 'a)
+(symbol? (list 1 2 3))
