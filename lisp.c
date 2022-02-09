@@ -322,6 +322,7 @@ void init_env() {
   prim_proc = bind1(mksym("-"), mkprim(PRIM_MINUS), prim_proc);
   prim_proc = bind1(mksym("*"), mkprim(PRIM_TIMES), prim_proc);
   prim_proc = bind1(mksym("="), mkprim(PRIM_EQ), prim_proc);
+  prim_proc = bind1(mksym("eq?"), mkprim(PRIM_EQ), prim_proc);
   prim_proc = bind1(mksym("<"), mkprim(PRIM_LT), prim_proc);
   prim_proc = bind1(mksym(">"), mkprim(PRIM_GT), prim_proc);
   prim_proc = bind1(mksym("display"), mkprim(PRIM_DISPLAY), prim_proc);
