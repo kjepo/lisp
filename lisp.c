@@ -1,12 +1,13 @@
 
-/*
- * For --load filename.scm 
- *
- * Implement '(a b c) to work as (quote (a b c))
- *
- * Replace magic numbers in objval and mknum in terms of NUM_TAG
- *
- */
+/**
+  * List of things to implement:
+  *
+  * (list 'a 'b) doesn't work
+  * Return to REPL after error
+  * C-c should stop interpreter and return to REPL
+  * Replace magic numbers in objval and mknum in terms of NUM_TAG
+  *
+ **/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -117,7 +118,7 @@ Obj mkproc(Obj parameters, Obj body, Obj env) {
 
 typedef enum {
   PRIM_CAR,  PRIM_CDR,  PRIM_CONS,  PRIM_PAIRP,  PRIM_PLUS,  PRIM_MINUS,  PRIM_TIMES,  PRIM_EQ,
-  PRIM_LT,  PRIM_GT, PRIM_DISPLAY } Primitive;
+  PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_LIST, PRIM_NUMBERP, PRIM_SYMBOLP } Primitive;
 
 Obj mkprim(Primitive p) {
   return p | (PRIM_TAG << 29);
@@ -303,27 +304,30 @@ void init_symbols() {
   StackPtr = 0;
 }
 
-Obj primitive_procedures;
+Obj prim_proc;
 
 void init_env() {
   // an environment BINDING id -> value is represented simply as cons(id, value)
   // an ENVIRONMENT is a list of bindings ( ( id . value ) ( id . value ) .... )
-  primitive_procedures = NIL;
-  primitive_procedures = bind1(mksym("#f"), False, primitive_procedures);
-  primitive_procedures = bind1(mksym("#t"), True, primitive_procedures);
-  primitive_procedures = bind1(mksym("x"), mknum(8), primitive_procedures);
-  primitive_procedures = bind1(mksym("y"), mknum(7), primitive_procedures);
-  primitive_procedures = bind1(mksym("car"), mkprim(PRIM_CAR), primitive_procedures);
-  primitive_procedures = bind1(mksym("cdr"), mkprim(PRIM_CDR), primitive_procedures);
-  primitive_procedures = bind1(mksym("cons"), mkprim(PRIM_CONS), primitive_procedures);
-  primitive_procedures = bind1(mksym("pair?"), mkprim(PRIM_PAIRP), primitive_procedures);
-  primitive_procedures = bind1(mksym("+"), mkprim(PRIM_PLUS), primitive_procedures);
-  primitive_procedures = bind1(mksym("-"), mkprim(PRIM_MINUS), primitive_procedures);
-  primitive_procedures = bind1(mksym("*"), mkprim(PRIM_TIMES), primitive_procedures);
-  primitive_procedures = bind1(mksym("="), mkprim(PRIM_EQ), primitive_procedures);
-  primitive_procedures = bind1(mksym("<"), mkprim(PRIM_LT), primitive_procedures);
-  primitive_procedures = bind1(mksym(">"), mkprim(PRIM_GT), primitive_procedures);
-  primitive_procedures = bind1(mksym("display"), mkprim(PRIM_DISPLAY), primitive_procedures);
+  prim_proc = NIL;
+  prim_proc = bind1(mksym("#f"), False, prim_proc);
+  prim_proc = bind1(mksym("#t"), True, prim_proc);
+  prim_proc = bind1(mksym("x"), mknum(8), prim_proc);
+  prim_proc = bind1(mksym("y"), mknum(7), prim_proc);
+  prim_proc = bind1(mksym("car"), mkprim(PRIM_CAR), prim_proc);
+  prim_proc = bind1(mksym("cdr"), mkprim(PRIM_CDR), prim_proc);
+  prim_proc = bind1(mksym("cons"), mkprim(PRIM_CONS), prim_proc);
+  prim_proc = bind1(mksym("pair?"), mkprim(PRIM_PAIRP), prim_proc);
+  prim_proc = bind1(mksym("+"), mkprim(PRIM_PLUS), prim_proc);
+  prim_proc = bind1(mksym("-"), mkprim(PRIM_MINUS), prim_proc);
+  prim_proc = bind1(mksym("*"), mkprim(PRIM_TIMES), prim_proc);
+  prim_proc = bind1(mksym("="), mkprim(PRIM_EQ), prim_proc);
+  prim_proc = bind1(mksym("<"), mkprim(PRIM_LT), prim_proc);
+  prim_proc = bind1(mksym(">"), mkprim(PRIM_GT), prim_proc);
+  prim_proc = bind1(mksym("display"), mkprim(PRIM_DISPLAY), prim_proc);
+  prim_proc = bind1(mksym("list"), mkprim(PRIM_LIST), prim_proc);
+  prim_proc = bind1(mksym("number?"), mkprim(PRIM_NUMBERP), prim_proc);
+  prim_proc = bind1(mksym("symbol?"), mkprim(PRIM_SYMBOLP), prim_proc);
 }
 
 // problem is mk_proc creates a list and adds a tag which is not a pair that CAR/CDR works on
@@ -355,10 +359,14 @@ void prim_eq()    { val = (car(argl) == cadr(argl) ? True : False); }
 void prim_lt()    { val = (objval(car(argl)) < objval(cadr(argl)) ? True : False); }
 void prim_gt()    { val = (objval(car(argl)) > objval(cadr(argl)) ? True : False); }
 void prim_display() { display(car(argl)); printf(" "); }
+void prim_list()  { val = argl; } 
+void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
+void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
+
 
 void (*primitives[])() = {
   prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq, prim_lt,
-  prim_gt, prim_display };
+  prim_gt, prim_display, prim_list, prim_numberp, prim_symbolp };
 
 #include "debug.h"
 
@@ -647,7 +655,7 @@ void eval() {
 
 // scanner and parser for LISP-style input
 typedef enum toktype {
-  END, ID, NUM, LPAR = '(', RPAR = ')', DOT = '.', SEMI = ';', PLUS = '+', MINUS = '-'
+  END, ID, NUM, LPAR = '(', RPAR = ')', DOT = '.', SEMI = ';', PLUS = '+', MINUS = '-', TICK = '\''
 } Token;
 
 Token token;                    // current token
@@ -682,6 +690,8 @@ Token scan2() {
     return token = LPAR;
   case RPAR:
     return token = RPAR;
+  case TICK:
+    return token = TICK;
   case DOT:
     return token = DOT;
   case '0': case '1': case '2': case '3': case '4':
@@ -765,8 +775,15 @@ Obj parse2();
 
 Obj parse3(Obj p) {
   Obj x;
-  if (token == RPAR) {
+  if (p == NIL) {
+    scan();
+    x = NIL;
+  } else if (token == RPAR) {
     x = cons(p, NIL);
+    scan();
+  } else if (token == TICK) {
+    scan();
+    x = cons(p, cons(cons(QUOTE_SYM, cons(parse(), NIL)), NIL));
     scan();
   } else if (token == DOT) {
     scan();
@@ -775,7 +792,7 @@ Obj parse3(Obj p) {
   } else if (token == NUM || token == ID || token == LPAR)
     x = cons(p, parse2());
   else
-    printf("expected (, ), ., number, or symbol but got %d\n", token);
+    printf("expected (, ), ., number, or symbol but got %c\n", token);
   return x;
 }
 
@@ -783,15 +800,17 @@ Obj parse2() {
   return parse3(parse());
 }
 
-// sexp --> ID | NUM | "(" sexp ")" | "(" sexp "." sexp ")"
-
+// sexp --> ID | NUM | "(" sexp ")" | "(" sexp "." sexp ")" | "'" sexp
 
 Obj parse() {                   /* recursive-descent parser */
-  while (token == RPAR)         /* accept extra ')' for conveniene */
-    scan();
-  if (token == ID || token == NUM)
+  if (token == RPAR)
+    return NIL;
+  if (token == ID || token == NUM) {
     return parse_atom();
-  else if (token == LPAR) {
+  } else if (token == TICK) {
+    scan();
+    return cons(QUOTE_SYM, cons(parse(), NIL));
+  } else if (token == LPAR) {
     scan();
     return parse2();
   } else if (token == END)
@@ -804,7 +823,7 @@ Obj parse() {                   /* recursive-descent parser */
 void rep() {
   scan();
   while ((expr = parse())) {
-    env = primitive_procedures;
+    env = prim_proc;
     eval();
   }
 }
