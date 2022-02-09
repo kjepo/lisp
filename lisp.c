@@ -1,3 +1,8 @@
+/**
+ **  Simple explicit-control register-machine Scheme-like interpreter
+ **  Written 2022 by Kjell Post, although it's been planned since '86
+ **
+ **/ 
 
 /**
   * List of things to implement:
@@ -6,6 +11,7 @@
   * Return to REPL after error
   * C-c should stop interpreter and return to REPL
   * Replace magic numbers in objval and mknum in terms of NUM_TAG
+  * Write garbage collector
   *
  **/
 
