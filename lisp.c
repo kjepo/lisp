@@ -2,9 +2,6 @@
 /*
  * For --load filename.scm 
  *
- * lisp should add ".scm" if it isn't provided 
- * after reading filename.scm it should continue reading from stdin
- *
  * Implement '(a b c) to work as (quote (a b c))
  *
  * Replace magic numbers in objval and mknum in terms of NUM_TAG
@@ -812,7 +809,10 @@ void rep() {
   }
 }
 
+
+
 int main(int argc, char *argv[]) {
+  char *usage = "usage: %s [-h] [-v] [filename ...]\n";
 
   init_symbols();
   init_env();
@@ -820,20 +820,27 @@ int main(int argc, char *argv[]) {
 
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] == '-') {
-      if (!strncmp(argv[i], "--load", 6)) {
-        if (!(fp = fopen(argv[i+1], "r"))) {
-          fprintf(stderr, "%s: could not open %s\n", argv[0], argv[i+1]);
-          exit(1);
-        } else {
-          printf("reading from %s\n", argv[i+1]);
-          rep();
-          fp = stdin;
-        }
-      } else if (argv[i][1] == 'v') {
+      if (argv[i][1] == 'v') {
         verbose = 1;
+      } else if (argv[i][1] == 'h') {
+        fprintf(stderr, usage, argv[0]);
+	fprintf(stderr, "\nThis LISP interpreter accepts the following commands:\n\n");
+	fprintf(stderr, "-h    Prints this help message.\n\n");
+	fprintf(stderr, "-v    Turns on verbose mode which prints machine registers, memory and symbol table.\n\n");
+	fprintf(stderr, "The source for this project is at http://www.github.com/kjepo/lisp\n");
+	exit(0);
       } else {
-        fprintf(stderr, "usage: %s [-v] [--load filename]\n", argv[0]);
+        fprintf(stderr, usage, argv[0]);
         exit(1);
+      }
+    } else {
+      if (!(fp = fopen(argv[i], "r"))) {
+	fprintf(stderr, "%s: could not open %s\n", argv[0], argv[i]);
+	exit(1);
+      } else {
+	printf("reading from %s\n", argv[i]);
+	rep();
+	fp = stdin;
       }
     }
   }
