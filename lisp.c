@@ -779,7 +779,6 @@ void expect(Token tok, char *msg) {
 
 Obj parse_atom() {
   Obj x;
-  char *p;
   if (token == ID) {
     x = mksym(id);
   } else if (token == NUM) {
@@ -791,56 +790,41 @@ Obj parse_atom() {
   return x;
 }
 
+
+// Recursive-descent parser for S-expressions
+// sexp --> ID | NUM | "(" sexp ")" | "'" sexp
+
 Obj parse();
-Obj parse2();
 
-Obj parse3(Obj p) {
-  Obj x;
-  if (p == NIL) {
-    scan();
-    x = NIL;
-  } else if (token == RPAR) {
-    x = cons(p, NIL);
-    scan();
-  } else if (token == TICK) {
-    scan();
-    x = cons(p, cons(cons(QUOTE_SYM, cons(parse(), NIL)), NIL));
-    scan();
-  } else if (token == DOT) {
-    scan();
-    x = cons(p, parse());
-    expect(RPAR, "expected ).");
-  } else if (token == NUM || token == ID || token == LPAR)
-    x = cons(p, parse2());
-  else {
-    printf("expected (, ), ., number, or symbol but got %c\n", token);
-    longjmp(jmpbuf, 1);
-  }
-  return x;
-}
-
-Obj parse2() {
-  return parse3(parse());
-}
-
-// sexp --> ID | NUM | "(" sexp ")" | "(" sexp "." sexp ")" | "'" sexp
-
-Obj parse() {                   /* recursive-descent parser */
-  if (token == RPAR)
+Obj parse_seq() {
+  if (token != RPAR && token != END)
+    return cons(parse(), parse_seq());
+  else
     return NIL;
-  if (token == ID || token == NUM) {
+}
+
+Obj parse() { 
+  if (token == END) {
+    return NIL;
+  } else if (token == ID || token == NUM) {
     return parse_atom();
   } else if (token == TICK) {
     scan();
     return cons(QUOTE_SYM, cons(parse(), NIL));
   } else if (token == LPAR) {
     scan();
-    return parse2();
-  } else if (token == END)
-    return 0;
-  else
+    if (token == RPAR) {
+      scan();			/* () */
+      return NIL;
+    } else {
+      Obj r = parse_seq();
+      expect(RPAR, "')' expected");
+      return r;
+    }
+  } else {
     error("expected number, symbol, or '('.");
-  return 0;
+    return NIL;			/* never executed */
+  }
 }
 
 void rep() {

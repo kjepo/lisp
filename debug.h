@@ -27,19 +27,20 @@ void display2(Obj expr, int dotted) {
   case PROC_TAG:
     //    printf("<procedure %d>", objval(expr));
     printf("<");
-    if (expr && car(objval(expr)))
+    if (expr && car(objval(expr))) {
+      printf("λ");
       display(car(objval(expr)));
-    else
+    } else
       printf("NULL");
-    printf(",");
+    printf(".");
     if (expr && cdr(objval(expr)) && cadr(objval(expr)))
       display(cadr(objval(expr)));
     else
       printf("NULL");
     printf(",env");
     /*
-    if (expr && cdr(objval(expr)) && CDDR(objval(expr)) && CADDR(objval(expr)))
-      display(CADDR(objval(expr)));
+    if (expr && cdr(objval(expr)) && cddr(objval(expr)) && caddr(objval(expr)))
+      display(caddr(objval(expr)));
     else
       printf("NULL");
     */
