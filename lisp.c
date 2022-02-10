@@ -1,14 +1,14 @@
 /**
- **  Simple explicit-control register-machine Scheme-like interpreter
- **  Written 2022 by Kjell Post, although it's been planned since '86
+ **  Simple explicit-control register-machine Scheme-like interpreter.
+ **  Written 2022 by Kjell Post (although a dormant project since '86)
  **
  **/ 
 
 /**
   * List of things to implement:
   *
-  * (list 'a 'b) doesn't work
-  * C-c should stop interpreter and return to REPL
+  * Dotted pairs can't be read
+  * Catch C-c to stop interpreter and return to REPL
   * Replace magic numbers in objval and mknum in terms of NUM_TAG
   * Write garbage collector
   *
