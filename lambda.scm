@@ -56,3 +56,12 @@ empty-list
 (symbol? 1)
 (symbol? 'a)
 (symbol? (list 1 2 3))
+
+(define sign
+  (lambda (n)
+    (if (< n 0) -1 1)))
+
+(sign 17)
+(sign -42)
+
+(display "Hello, world\nThis is a tab\tcharacter")
