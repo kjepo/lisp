@@ -42,7 +42,7 @@ x
 
 (list 1 2 3)
 (list (* 3 3) (* 4 4))
-; (list 'a 1 '(3 1 4))
+(list 'a 1 '(3 1 4))
 
 'a
 (car '(1 2 3))
@@ -65,3 +65,9 @@ empty-list
 (sign -42)
 
 (display "Hello, world\nThis is a tab\tcharacter")
+(+ (* 3 (+ (* 2 4) (+ 3 5))) (+ (- 10 7) 6)) ; ==> 57
+
+(define square
+  (lambda (x)
+    (* x x))
+
