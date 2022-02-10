@@ -77,6 +77,30 @@ empty-list
 (sign 17)
 (sign -42)
 ```
+The informal description of the language is as follows:
+```
+expr    : symbol | ( expr* ) | ' expr
+symbol  : ID | NUMBER | STRING
+```
+
+where `ID` is an identifier (letters optionally followed by letters and digits, and
+where letters also include the special characters `#+-.*/<=>!?:$%_&~^`,
+`NUMBER` is an optional sign (`+` or `-`) followed by one or more digits,
+and `STRING` is a `"`-enclosed string which can contain the usual escape
+sequences `\n`, `t`, etc.
+
+There are some built-in constants and primitives:
+
+- `#f` denotes false.
+- `#t` denotes true.
+- `quote`, e.g., `(quote x)` yields `x`, `(quote (1 2 3))` yields `(1 2 3)`.
+The shorthand `'x` can be used instead of `(quote x)`.
+- `if`, e.g., `(if x y z)` evaluates `y` if `x` evaluates to anything but `#f` and `z` if `x`
+evaluates to `#f`.  If `z` is omitted, the result is unspecified.
+- `(define x y)` evaluates `y` and binds it to `x`.  If there was a previous binding for `x`, 
+it is overwritten.
+
+# Future plans
 
 While I'm not aiming to write a fully fledged Scheme interpreter there
 are a few things I'd like to do:
