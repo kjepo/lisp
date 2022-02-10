@@ -94,9 +94,9 @@ There are some built-in constants and primitives:
 - `#f` denotes false.
 - `#t` denotes true.
 - `(quote x)` yields `x`, `(quote (1 2 3))` yields `(1 2 3)`.
-The shorthand `'x` can be used instead of `(quote x)`.
+The shorthand `'x` can be used instead of `(quote x)`.  For instance, `'()` is the empty list.	
 - `(if x y z)` evaluates `y` if `x` evaluates to anything but `#f` and `z` if `x`
-evaluates to `#f`.  If `z` is omitted, the result is unspecified.
+evaluates to `#f`.  If `x` is false and `z` is omitted, the result is unspecified.
 - `(define x y)` evaluates `y` and binds it to `x`.  If there was a previous binding for `x`, 
 it is overwritten.
 - `(set! x y)` sets `x` to the value of `y`.  If `x` has not previously been defined, an error
@@ -106,7 +106,7 @@ is generated.
 evaluates to `25` because `x` and `y` is bound to `3` and `4`, respectively.
 The parameter list is optional, i.e.,
 ```(define foo (lambda () (display 'foo!)))```
-defines a function `foo` which when invoked with `(foo)` writes `foo!`.
+defines a function `foo` which when invoked with `(foo)` outputs `foo!`.
 - `(begin expr1 expr2 ... )` evaluates `expr1`, `expr2`, etc from left to right.
 - `(procedure arg1 arg2 ...)` applies `procedure` to the arguments `arg1`, `arg2`, etc,
 where `procedure` is either the result of a lambda expression, or one of the built-in
@@ -122,7 +122,6 @@ are a few things I'd like to do:
 - Change the boxed representation to use lsb for the tag.
 - Catch C-c and use GNU's readline library to parse input from stdin.
 - Add more primitives, for instance `let`, `cond`
-- Add strings
 
 # References
 
