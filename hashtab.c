@@ -39,8 +39,17 @@ char *find(int index) {
 
 void dump_hashtab() {
   printf("   HASH TABLE:\n");
-  for (int i = 0; i < HASHTABSIZ; i++)
-    printf("%4d: %s\n", i, (hashtab[i].id ? hashtab[i].id : ""));
+  for (int i = 0; i < HASHTABSIZ; i++) {
+    printf("%4d: \"%s\" ", i, (hashtab[i].id ? hashtab[i].id : ""));
+    /*
+    if (hashtab[i].id) {
+      for (char *p = hashtab[i].id; *p; p++)
+	printf("[%c]", *p);
+      printf(" %d chars", (int) strlen(hashtab[i].id));
+    }
+    */
+    printf("\n");
+  }
 }
 
 void testhashtab() {

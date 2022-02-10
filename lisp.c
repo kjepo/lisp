@@ -54,7 +54,7 @@ void display2(Obj, int);
 #define NUM_TAG    2
 #define PROC_TAG   3
 #define PRIM_TAG   4
-#define STRING_TAG 5
+#define STR_TAG    5
 #define BOOL_TAG   6
 #define ARRAY_TAG  7
 
@@ -98,7 +98,7 @@ Obj mknum(int n) {
   return (n & 0x1fffffff) | (NUM_TAG << 29);
 }
 
-//Obj mknum(int n) { return objval(n) | (NUM_TAG << 29); }
+Obj mkstr(char *str) { return lookup(str) | (STR_TAG << 29); }
 Obj mksym(char *id) { return lookup(id) | (SYMBOL_TAG << 29); }
 Obj mkbool(char *id) { return lookup(id) | (BOOL_TAG << 29); }
 
@@ -346,7 +346,7 @@ void init_env() {
 // problem is mk_proc creates a list and adds a tag which is not a pair that CAR/CDR works on
 
 int is_pair(expr)        { return PAIR_TAG == objtype(expr) && expr != NIL; }
-int is_self_evaluating() { return NUM_TAG == objtype(expr) || BOOL_TAG == objtype(expr); }
+int is_self_evaluating() { return NUM_TAG == objtype(expr) || STR_TAG == objtype(expr) || BOOL_TAG == objtype(expr); }
 int is_variable()        { return SYMBOL_TAG == objtype(expr); }
 int is_quote()           { return PAIR_TAG == objtype(expr) && QUOTE_SYM == car(expr); }
 int is_if()              { return PAIR_TAG == objtype(expr) && IF_SYM == car(expr); }
@@ -379,7 +379,7 @@ void prim_times() { val = mknum(objval(car(argl)) * objval(cadr(argl))); } /* fi
 void prim_eq()    { val = (car(argl) == cadr(argl) ? True : False); }
 void prim_lt()    { val = (objval(car(argl)) < objval(cadr(argl)) ? True : False); } /* fixme: verify_num */
 void prim_gt()    { val = (objval(car(argl)) > objval(cadr(argl)) ? True : False); } /* fixme: verify_num */
-void prim_display() { display(car(argl)); printf(" "); }
+void prim_display() { display(car(argl)); }
 void prim_list()  { val = argl; } 
 void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
 void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
@@ -676,7 +676,7 @@ void eval() {
 
 // scanner and parser for LISP-style input
 typedef enum toktype {
-  END, ID, NUM, LPAR = '(', RPAR = ')', DOT = '.', SEMI = ';', PLUS = '+', MINUS = '-', TICK = '\''
+  END, ID, NUM, STR, LPAR = '(', RPAR = ')', DOT = '.', PLUS = '+', MINUS = '-', TICK = '\''
 } Token;
 
 Token token;                    // current token
@@ -689,7 +689,8 @@ int legal_symbol_rest(char ch) { return isalnum(ch) || strchr("#+-.*/<=>!?:$%_&~
 FILE *fp;
 
 Token scan2() {
-  char ch;
+  char *p;
+  char ch, lastchar;
 
  start_scan:
 
@@ -698,7 +699,7 @@ Token scan2() {
       return token = END;
   } while (isspace(ch));
 
-  if (ch == SEMI) {             /* ; means comment until end-of-line */
+  if (ch == ';') {             /* ; means comment until end-of-line */
     do {
       if (EOF == (ch = fgetc(fp)))
         return token = END;
@@ -707,6 +708,38 @@ Token scan2() {
   }
 
   switch (ch) {                 /* ch is not ";", whitespace or EOF */
+  case '\"':
+    p = id;
+    lastchar = ch;  
+    while ((ch = fgetc(fp)) != EOF) {
+      if (lastchar == '\\') {
+	if (ch == 'a')
+	  *(p-1) = '\a';
+	if (ch == 'b')
+	  *(p-1) = '\b';
+	if (ch == 'f')
+	  *(p-1) = '\f';
+	if (ch == 'n')
+	  *(p-1) = '\n';
+	if (ch == 'r')
+	  *(p-1) = '\r';
+	if (ch == 't')
+	  *(p-1) = '\t';
+	if (ch == 'v')
+	  *(p-1) = '\v';
+	if (ch == '\'')
+	  *(p-1) = '\'';
+	if (ch == '\\')
+	  *(p-1) = '\\';
+      } else if (ch == '\"') {
+	*p = 0;
+	return (token = STR);
+      } else {
+	*p++ = ch;
+      }
+      lastchar = ch;
+    }
+    error("Unterminated string.");
   case LPAR:
     return token = LPAR;
   case RPAR:
@@ -783,6 +816,8 @@ Obj parse_atom() {
     x = mksym(id);
   } else if (token == NUM) {
     x = mknum(nval);
+  } else if (token == STR) {
+    x = mkstr(id);
   } else {
     error("expected number or symbol.");
   }
@@ -806,7 +841,7 @@ Obj parse_seq() {
 Obj parse() { 
   if (token == END) {
     return NIL;
-  } else if (token == ID || token == NUM) {
+  } else if (token == ID || token == NUM || token == STR) {
     return parse_atom();
   } else if (token == TICK) {
     scan();

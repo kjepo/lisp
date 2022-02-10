@@ -19,6 +19,7 @@ void display2(Obj expr, int dotted) {
     }
     break;
   case SYMBOL_TAG:
+  case STR_TAG:
     printf("%s", find(objval(expr)));
     break;
   case NUM_TAG:
