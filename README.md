@@ -10,6 +10,7 @@ arguments explicit.  The code is based on SICP, chapter 5 (and forwards).
 The goal is now to write the same code in C (file `lisp.c`).
 The code is not finished yet but a rudimentary interpreter is working
 and can handle the examples below.
+
 ```
 (define id (lambda (x) x))
 (id 42)
@@ -48,14 +49,14 @@ x
 (define fact
   (lambda (n)
     (if (zero? n)
-	1
-	(* n (fact (-1+ n))))))
+        1
+        (* n (fact (-1+ n))))))
 
 (fact 10)
 
 (list 1 2 3)
 (list (* 3 3) (* 4 4))
-; (list 'a 1 '(3 1 4))
+(list 'a 1 '(3 1 4))
 
 'a
 (car '(1 2 3))
@@ -76,7 +77,15 @@ empty-list
 
 (sign 17)
 (sign -42)
+
+(display "Hello, world\nThis is a tab\tcharacter")
+(+ (* 3 (+ (* 2 4) (+ 3 5))) (+ (- 10 7) 6)) ; ==> 57
+
+(define square
+  (lambda (x)
+    (* x x))
 ```
+
 The informal description of the language is as follows:
 ```
 expr    : symbol | ( expr* ) | ' expr
@@ -94,21 +103,29 @@ There are some built-in constants and primitives:
 - `#f` denotes false.
 - `#t` denotes true.
 - `(quote x)` yields `x`, `(quote (1 2 3))` yields `(1 2 3)`.
-The shorthand `'x` can be used instead of `(quote x)`.  For instance, `'()` is the empty list.	
+The shorthand `'x` can be used instead of `(quote x)`.  For instance, `'()` is the empty list.  
 - `(if x y z)` evaluates `y` if `x` evaluates to anything but `#f` and `z` if `x`
 evaluates to `#f`.  If `x` is false and `z` is omitted, the result is unspecified.
 - `(define x y)` evaluates `y` and binds it to `x`.  If there was a previous binding for `x`, 
 it is overwritten.
 - `(set! x y)` sets `x` to the value of `y`.  If `x` has not previously been defined, an error
 is generated.
-- `(lambda parameter-list body)` evaluates to a procedure which later can be applied to arguments, e.g.,
-```((lambda (x y) (+ (* x x) (* y y))) 3 4)```
-evaluates to `25` because `x` and `y` is bound to `3` and `4`, respectively.
+- `(begin expr₁ expr₂ ... )` evaluates `expr₁`, `expr₂`, etc from left to right.
+- `(lambda (p₁ p₂ ... ) body)` evaluates to a procedure which later can be applied to arguments, e.g.,
+
+```
+    ((lambda (x y) (+ (* x x) (* y y))) 3 4) ⇒ 25
+```
+
+because `x` and `y` is bound to `3` and `4`, respectively.
 The parameter list is optional, i.e.,
-```(define foo (lambda () (display 'foo!)))```
+
+```
+    (define foo (lambda () (display 'foo!)))
+```
+
 defines a function `foo` which when invoked with `(foo)` outputs `foo!`.
-- `(begin expr1 expr2 ... )` evaluates `expr1`, `expr2`, etc from left to right.
-- `(procedure arg1 arg2 ...)` applies `procedure` to the arguments `arg1`, `arg2`, etc,
+- `(procedure arg₁ arg₂  ...)` applies `procedure` to the arguments `arg₁`, `arg₂`, etc,
 where `procedure` is either the result of a lambda expression, or one of the built-in
 functions `car`, `cdr`, `cons`, `pair?`, `+`, `-`, `*`, `=`, `<`, `>`, `display`, `list`,
 `number?`, `symbol?`.
@@ -128,6 +145,3 @@ are a few things I'd like to do:
 Abelson and Sussman *Structure and Interpretation of Computer Programs*:
 <br>
 https://mitpress.mit.edu/sites/default/files/sicp/index.html
-
-
-
