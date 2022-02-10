@@ -8,7 +8,6 @@
   * List of things to implement:
   *
   * (list 'a 'b) doesn't work
-  * Return to REPL after error
   * C-c should stop interpreter and return to REPL
   * Replace magic numbers in objval and mknum in terms of NUM_TAG
   * Write garbage collector
@@ -20,17 +19,23 @@
 #include <assert.h>
 #include <ctype.h>
 #include <string.h>
+#include <setjmp.h>
 #include <readline/readline.h>
 #include "lisp.h"
 #include "hashtab.h"
 
 int verbose = 0;
 
-void error(char *s)   { printf("%s\n", s); exit(1); }
+static jmp_buf jmpbuf;
+void error(char *s)   {
+  printf("%s\n", s); longjmp(jmpbuf, 1);
+}
+
 void verify(int test) { assert(test); printf("OK!\n"); }
 
 void display(Obj);
 void display2(Obj, int);
+
 
 // Objects are tagged with 3 most significant bits xxx
 // xxx11111 11111111 11111111 11111111
@@ -70,6 +75,7 @@ int objval(Obj n) {
 
 void unbound(Obj id) {
   printf("Unbound variable %s\n", find(objval(id)));
+  longjmp(jmpbuf, 1);
 }
 
 #define MEMSIZE 2048
@@ -352,19 +358,27 @@ int is_application()     { return PAIR_TAG == objtype(expr); }
 int is_primitive(Obj p)  { return PRIM_TAG == objtype(p); }
 int is_compound(Obj p)   { return PROC_TAG == objtype(p); }
 
+void verify_list(Obj p, char *fcnname) {
+  if (is_pair(p) && is_pair(car(p)))
+    return;
+  printf("The object "); display(car(p));
+  printf(" passed as the first argument of %s, is not of the correct type.\n", fcnname);
+  longjmp(jmpbuf, 1);
+}
+
 /* argl is a list of arguments (a1 a2 a3 .. aN) */
 /* if the primitive function only takes one argument, it is a1 */
 /* if the primitive function takes two arguments, they are a1 and a2 */
-void prim_car()   { val = car(car(argl)); }
-void prim_cdr()   { val = cdr(car(argl)); }
+void prim_car()   { verify_list(argl, "car"); val = car(car(argl)); }
+void prim_cdr()   { verify_list(argl, "cdr"); val = cdr(car(argl)); }
 void prim_cons()  { val = cons(car(argl), cadr(argl)); }
 void prim_pairp() { val = is_pair(car(argl)) ? True : False; }
-void prim_plus()  { val = mknum(objval(car(argl)) + objval(cadr(argl))); }
-void prim_minus() { val = mknum(objval(car(argl)) - objval(cadr(argl))); }
-void prim_times() { val = mknum(objval(car(argl)) * objval(cadr(argl))); }
+void prim_plus()  { val = mknum(objval(car(argl)) + objval(cadr(argl))); } /* fixme: verify_num */
+void prim_minus() { val = mknum(objval(car(argl)) - objval(cadr(argl))); } /* fixme: verify_num */
+void prim_times() { val = mknum(objval(car(argl)) * objval(cadr(argl))); } /* fixme: verify_num */
 void prim_eq()    { val = (car(argl) == cadr(argl) ? True : False); }
-void prim_lt()    { val = (objval(car(argl)) < objval(cadr(argl)) ? True : False); }
-void prim_gt()    { val = (objval(car(argl)) > objval(cadr(argl)) ? True : False); }
+void prim_lt()    { val = (objval(car(argl)) < objval(cadr(argl)) ? True : False); } /* fixme: verify_num */
+void prim_gt()    { val = (objval(car(argl)) > objval(cadr(argl)) ? True : False); } /* fixme: verify_num */
 void prim_display() { display(car(argl)); printf(" "); }
 void prim_list()  { val = argl; } 
 void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
@@ -675,7 +689,7 @@ int legal_symbol_rest(char ch) { return isalnum(ch) || strchr("#+-.*/<=>!?:$%_&~
 FILE *fp;
 
 Token scan2() {
-  char ch, sgn;
+  char ch;
 
  start_scan:
 
@@ -798,8 +812,10 @@ Obj parse3(Obj p) {
     expect(RPAR, "expected ).");
   } else if (token == NUM || token == ID || token == LPAR)
     x = cons(p, parse2());
-  else
+  else {
     printf("expected (, ), ., number, or symbol but got %c\n", token);
+    longjmp(jmpbuf, 1);
+  }
   return x;
 }
 
@@ -877,6 +893,7 @@ int main(int argc, char *argv[]) {
   printf("%s\n", input);
   */
 
+  setjmp(jmpbuf);
   rep();
 
   if (verbose) {
