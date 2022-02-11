@@ -125,6 +125,14 @@ The parameter list is optional, i.e.,
 ```
 
 defines a function `foo` which when invoked with `(foo)` outputs `foo!`.
+Also, there is a mechanism to capture a variable number of arguments: with
+
+```
+    (define first (lambda l (car l)))
+```
+all the arguments are bound to the formal parameter `l` so that
+`(first 1 2 3) ⇒ 25`.
+
 - `(procedure arg₁ arg₂  ...)` applies `procedure` to the arguments `arg₁`, `arg₂`, etc,
 where `procedure` is either the result of a `lambda` expression, or one of the built-in
 functions `car`, `cdr`, `cons`, `pair?`, `+`, `-`, `*`, `=`, `<`, `>`, `display`, `list`,
