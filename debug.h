@@ -3,7 +3,7 @@ void display2(Obj expr, int dotted) {
   switch (objtype(expr)) {
   case PAIR_TAG:
     if (expr == 0)
-      printf("NIL");
+      printf("()");
     else {
       if (!dotted)
 	printf("(");

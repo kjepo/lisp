@@ -11,10 +11,8 @@
   * Catch C-c to stop interpreter and return to REPL
   * Replace magic numbers in objval and mknum in terms of NUM_TAG
   * Write garbage collector
-  * Load a file lib.scm with standard library definitions 
   * Special forms and, or, not that doesn't evaluate arguments unnecessarily
   * call/cc
-  *
   *
  **/
 
@@ -86,7 +84,6 @@ void unbound(Obj id) {
 Obj thecars[MEMSIZE];
 Obj thecdrs[MEMSIZE];
 Obj free_index = 1;                    // can't start at 0 because 0 means NIL
-
 Obj NIL = 0;
 
 #define car(p) (thecars[p])
@@ -97,10 +94,7 @@ Obj NIL = 0;
 #define caddr(p) (car(cdr(cdr(p))))
 #define cadddr(p) (car(cdr(cdr(cdr(p)))))
 
-Obj mknum(int n) {
-  return (n & 0x1fffffff) | (NUM_TAG << 29);
-}
-
+Obj mknum(int n) { return (n & 0x1fffffff) | (NUM_TAG << 29); }
 Obj mkstr(char *str) { return lookup(str) | (STR_TAG << 29); }
 Obj mksym(char *id) { return lookup(id) | (SYMBOL_TAG << 29); }
 Obj mkbool(char *id) { return lookup(id) | (BOOL_TAG << 29); }
@@ -113,17 +107,11 @@ Obj cons(Obj car_, Obj cdr_) {  /* aka mkpair */
   return free_index++ | (PAIR_TAG << 29);
 }
 
-Obj list(Obj p) {
-  return cons(p, NIL);
-}
+Obj list(Obj p) { return cons(p, NIL); }
 
-Obj append(Obj l, Obj m) {
-  return (l == NIL ? m : cons(car(l), append(cdr(l), m)));
-}
+Obj append(Obj l, Obj m) { return (l == NIL ? m : cons(car(l), append(cdr(l), m))); }
 
-Obj adjoin_arg(Obj arg, Obj arglist) {
-  return append(arglist, list(arg));
-}
+Obj adjoin_arg(Obj arg, Obj arglist) { return append(arglist, list(arg)); }
 
 Obj mkproc(Obj parameters, Obj body, Obj env) {
   /* a procedure is a triple (parameters body env) */
@@ -133,11 +121,9 @@ Obj mkproc(Obj parameters, Obj body, Obj env) {
 
 typedef enum {
   PRIM_CAR,  PRIM_CDR,  PRIM_CONS,  PRIM_PAIRP,  PRIM_PLUS,  PRIM_MINUS,  PRIM_TIMES,  PRIM_EQ,
-  PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_LIST, PRIM_NUMBERP, PRIM_SYMBOLP, PRIM_NULLP } Primitive;
+  PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP, PRIM_SYMBOLP, PRIM_NULLP } Primitive;
 
-Obj mkprim(Primitive p) {
-  return p | (PRIM_TAG << 29);
-}
+Obj mkprim(Primitive p) { return p | (PRIM_TAG << 29); }
 
 Obj TRUE_SYM, IF_SYM, EQ_SYM, LET_SYM, ADD_SYM, SUB_SYM,
   MUL_SYM, DIV_SYM, DEFINE_SYM, CAR_SYM, CDR_SYM, CONS_SYM, ATOM_SYM,
@@ -207,7 +193,6 @@ char *continuation_string[] = {
   "UNKNOWN_EXPRESSION_TYPE"
 };
 
-
 Continuation cont, label;
 Obj Stack[100];
 int StackPtr;
@@ -225,7 +210,7 @@ Obj pairup(Obj vars, Obj vals) {
 Obj bind(Obj vars, Obj vals, Obj env) {
   if (objtype(vars) != PAIR_TAG)                // ((lambda l body) '(1 2 3)) => bind l/'(1 2 3)
     return append(pairup(cons(vars, NIL), cons(vals, NIL)), env);
-  else                                          // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3
+  else                                          // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3 
     return append(pairup(vars, vals), env);
 }
 
@@ -330,8 +315,6 @@ void init_env() {
   prim_proc = NIL;
   prim_proc = bind1(mksym("#f"), False, prim_proc);
   prim_proc = bind1(mksym("#t"), True, prim_proc);
-  prim_proc = bind1(mksym("x"), mknum(8), prim_proc);
-  prim_proc = bind1(mksym("y"), mknum(7), prim_proc);
   prim_proc = bind1(mksym("car"), mkprim(PRIM_CAR), prim_proc);
   prim_proc = bind1(mksym("cdr"), mkprim(PRIM_CDR), prim_proc);
   prim_proc = bind1(mksym("cons"), mkprim(PRIM_CONS), prim_proc);
@@ -340,31 +323,30 @@ void init_env() {
   prim_proc = bind1(mksym("-"), mkprim(PRIM_MINUS), prim_proc);
   prim_proc = bind1(mksym("*"), mkprim(PRIM_TIMES), prim_proc);
   prim_proc = bind1(mksym("="), mkprim(PRIM_EQ), prim_proc);
-  prim_proc = bind1(mksym("eq?"), mkprim(PRIM_EQ), prim_proc);
   prim_proc = bind1(mksym("<"), mkprim(PRIM_LT), prim_proc);
   prim_proc = bind1(mksym(">"), mkprim(PRIM_GT), prim_proc);
   prim_proc = bind1(mksym("display"), mkprim(PRIM_DISPLAY), prim_proc);
-  prim_proc = bind1(mksym("list"), mkprim(PRIM_LIST), prim_proc);
   prim_proc = bind1(mksym("number?"), mkprim(PRIM_NUMBERP), prim_proc);
   prim_proc = bind1(mksym("symbol?"), mkprim(PRIM_SYMBOLP), prim_proc);
   prim_proc = bind1(mksym("null?"), mkprim(PRIM_NULLP), prim_proc);
 }
 
-// problem is mk_proc creates a list and adds a tag which is not a pair that CAR/CDR works on
-
-int is_num(expr)         { return NUM_TAG == objtype(expr); }
-int is_pair(expr)        { return PAIR_TAG == objtype(expr) && expr != NIL; }
-int is_self_evaluating() { return NUM_TAG == objtype(expr) || STR_TAG == objtype(expr) || BOOL_TAG == objtype(expr); }
+int is_num(Obj p)        { return NUM_TAG == objtype(p); }
+int is_str(Obj p)        { return STR_TAG == objtype(p); }
+int is_bool(Obj p)       { return BOOL_TAG == objtype(p); }
 int is_variable()        { return SYMBOL_TAG == objtype(expr); }
-int is_quote()           { return PAIR_TAG == objtype(expr) && QUOTE_SYM == car(expr); }
-int is_if()              { return PAIR_TAG == objtype(expr) && IF_SYM == car(expr); }
-int is_assignment()      { return PAIR_TAG == objtype(expr) && SETBANG_SYM == car(expr); }
-int is_definition()      { return PAIR_TAG == objtype(expr) && DEFINE_SYM == car(expr); }
-int is_lambda()          { return PAIR_TAG == objtype(expr) && LAMBDA_SYM == car(expr); }
-int is_begin()           { return PAIR_TAG == objtype(expr) && BEGIN_SYM == car(expr); }
-int is_application()     { return PAIR_TAG == objtype(expr); }
 int is_primitive(Obj p)  { return PRIM_TAG == objtype(p); }
 int is_compound(Obj p)   { return PROC_TAG == objtype(p); }
+int is_nil(Obj p)        { return p == NIL; }
+int is_pair(Obj p)       { return PAIR_TAG == objtype(p) && !is_nil(p); }
+int is_self_evaluating() { return is_nil(expr) || is_num(expr) || is_str(expr) || is_bool(expr); }
+int is_quote()           { return is_pair(expr) && QUOTE_SYM == car(expr); }
+int is_if()              { return is_pair(expr) && IF_SYM == car(expr); }
+int is_assignment()      { return is_pair(expr) && SETBANG_SYM == car(expr); }
+int is_definition()      { return is_pair(expr) && DEFINE_SYM == car(expr); }
+int is_lambda()          { return is_pair(expr) && LAMBDA_SYM == car(expr); }
+int is_begin()           { return is_pair(expr) && BEGIN_SYM == car(expr); }
+int is_application()     { return is_pair(expr); }
 
 void verify_list(Obj p, char *fcnname) {
   if (is_pair(p) && is_pair(car(p)))
@@ -398,14 +380,13 @@ void prim_pairp() { val = is_pair(car(argl)) ? True : False; }
 void prim_nullp() { val = (car(argl) == NIL ? True : False); }
 
 void prim_display() { display(car(argl)); }
-void prim_list()  { val = argl; } 
 void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
 void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
 
 
 void (*primitives[])() = {
   prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq, prim_lt,
-  prim_gt, prim_display, prim_list, prim_numberp, prim_symbolp, prim_nullp };
+  prim_gt, prim_display, prim_numberp, prim_symbolp, prim_nullp };
 
 #include "debug.h"
 
@@ -705,13 +686,13 @@ int legal_symbol_start(char ch) { return isalpha(ch) || strchr("#+-.*/<=>!?:$%_&
 int legal_symbol_rest(char ch) { return isalnum(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }   
 
 FILE *fp;
+char *progname;
 
-Token scan2() {
+Token scan() {
   char *p;
   char ch, lastchar;
 
  start_scan:
-
   do {                          /* skip whitespace */
     if (EOF == (ch = fgetc(fp)))
       return token = END;
@@ -731,24 +712,15 @@ Token scan2() {
     lastchar = ch;  
     while ((ch = fgetc(fp)) != EOF) {
       if (lastchar == '\\') {
-	if (ch == 'a')
-	  *(p-1) = '\a';
-	if (ch == 'b')
-	  *(p-1) = '\b';
-	if (ch == 'f')
-	  *(p-1) = '\f';
-	if (ch == 'n')
-	  *(p-1) = '\n';
-	if (ch == 'r')
-	  *(p-1) = '\r';
-	if (ch == 't')
-	  *(p-1) = '\t';
-	if (ch == 'v')
-	  *(p-1) = '\v';
-	if (ch == '\'')
-	  *(p-1) = '\'';
-	if (ch == '\\')
-	  *(p-1) = '\\';
+	if (ch == 'a')	  *(p-1) = '\a';
+	if (ch == 'b')	  *(p-1) = '\b';
+	if (ch == 'f')	  *(p-1) = '\f';
+	if (ch == 'n')	  *(p-1) = '\n';
+	if (ch == 'r')	  *(p-1) = '\r';
+	if (ch == 't')	  *(p-1) = '\t';
+	if (ch == 'v')	  *(p-1) = '\v';
+	if (ch == '\'')	  *(p-1) = '\'';
+	if (ch == '\\')	  *(p-1) = '\\';
       } else if (ch == '\"') {
 	*p = 0;
 	return (token = STR);
@@ -773,53 +745,23 @@ Token scan2() {
     return token = NUM;
   default:
     if (legal_symbol_start(ch) && ch != ' ') {
-      char *p = id;
+      char cc, *p = id;
       *p++ = ch;
       while ((ch = fgetc(fp)) && legal_symbol_rest(ch))
         *p++ = ch;
       ungetc(ch, fp);
       *p = 0;
-      return token = ID;
+      // a number is an optional + or - followed by at least one or more digits
+      // these are numbers: 1, -1, +1, -12 but these are not -, -1x, +, ++
+      if (sscanf(id, "%d%c", &nval, &cc) == 1 && cc == 0)
+	return (token = NUM);
+      return (token = ID);
     } else
       printf("lexical error: %c\n", ch);
     break;
   }
   return token = END;
 }
-
-// a number is an optional + or - followed by at least one or more digits
-// these are numbers: 1, -1, +1, -12, 
-// these are not considered numbers: -, -1x, +, ++
-
-int isnumberl(char *s) {
-  if (strlen(s) > 1 && (*s == '-' || *s == '+'))
-    s++;
-  while (*s && isdigit(*s))
-    s++;
-  return *s == 0;
-}
-
-void scan() {
-  Token t = scan2();
-  if (t == ID && isnumberl(id)) {
-    t = NUM;
-    sscanf(id, "%d", &nval);
-  }
-  token = t;
-  return;
-
-  if (t == ID) {
-    printf("got ID ");
-    printf("(%s)", id);
-  } else if (t == NUM) {
-    printf("got NUM ");
-    printf("(%d)", nval);
-  } else
-    printf("got token %d", t);
-  NL;
-  token = t;
-}
-
 
 void expect(Token tok, char *msg) {
   if (token == tok)
@@ -842,10 +784,6 @@ Obj parse_atom() {
   scan();
   return x;
 }
-
-
-// Recursive-descent parser for S-expressions
-// sexp --> ID | NUM | STRING | "(" sexp* ")" | "'" sexp
 
 Obj parse();
 
@@ -888,10 +826,20 @@ void rep() {
   }
 }
 
-
+void slurp(char *fname) {
+  if (!(fp = fopen(fname, "r"))) {
+    fprintf(stderr, "%s: could not open %s\n", progname, fname);
+    exit(1);
+  } else {
+    printf("parsing %s...\n", fname);
+    rep();
+    fp = stdin;
+  }
+}
 
 int main(int argc, char *argv[]) {
   char *usage = "usage: %s [-h] [-v] [filename ...]\n";
+  progname = argv[0];
 
   init_symbols();
   init_env();
@@ -900,30 +848,25 @@ int main(int argc, char *argv[]) {
   if (setjmp(jmpbuf) == 1)
     goto repl;
 
+  slurp("lib.scm");
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] == '-') {
       if (argv[i][1] == 'v') {
         verbose = 1;
       } else if (argv[i][1] == 'h') {
-        fprintf(stderr, usage, argv[0]);
+        fprintf(stderr, usage, progname);
 	fprintf(stderr, "\nThis LISP interpreter accepts the following commands:\n\n");
 	fprintf(stderr, "-h    Prints this help message.\n\n");
 	fprintf(stderr, "-v    Turns on verbose mode which prints machine registers, memory and symbol table.\n\n");
 	fprintf(stderr, "The source for this project is at http://www.github.com/kjepo/lisp\n");
 	exit(0);
       } else {
-        fprintf(stderr, usage, argv[0]);
+        fprintf(stderr, usage, progname);
         exit(1);
       }
     } else {
-      if (!(fp = fopen(argv[i], "r"))) {
-	fprintf(stderr, "%s: could not open %s\n", argv[0], argv[i]);
-	exit(1);
-      } else {
-	printf("reading from %s\n", argv[i]);
-	rep();
-	fp = stdin;
-      }
+      slurp(argv[i]);
+      fp = stdin;
     }
   }
 
