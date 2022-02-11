@@ -1,6 +1,6 @@
 /**
- **  Simple explicit-control register-machine Scheme-like interpreter.
- **  Written 2022 by Kjell Post (although a dormant project since '86)
+ **  Simple explicit-control register-machine Scheme-like interpreter
+ **  Written in 2022 by Kjell Post (but a dormant project since 1986)
  **
  **/ 
 
@@ -11,6 +11,10 @@
   * Catch C-c to stop interpreter and return to REPL
   * Replace magic numbers in objval and mknum in terms of NUM_TAG
   * Write garbage collector
+  * Load a file lib.scm with standard library definitions 
+  * Special forms and, or, not that doesn't evaluate arguments unnecessarily
+  * call/cc
+  *
   *
  **/
 
@@ -28,10 +32,9 @@ int verbose = 0;
 
 static jmp_buf jmpbuf;
 void error(char *s)   {
-  printf("%s\n", s); longjmp(jmpbuf, 1);
+  printf("%s\n", s);
+  longjmp(jmpbuf, 1);
 }
-
-void verify(int test) { assert(test); printf("OK!\n"); }
 
 void display(Obj);
 void display2(Obj, int);
@@ -130,7 +133,7 @@ Obj mkproc(Obj parameters, Obj body, Obj env) {
 
 typedef enum {
   PRIM_CAR,  PRIM_CDR,  PRIM_CONS,  PRIM_PAIRP,  PRIM_PLUS,  PRIM_MINUS,  PRIM_TIMES,  PRIM_EQ,
-  PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_LIST, PRIM_NUMBERP, PRIM_SYMBOLP } Primitive;
+  PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_LIST, PRIM_NUMBERP, PRIM_SYMBOLP, PRIM_NULLP } Primitive;
 
 Obj mkprim(Primitive p) {
   return p | (PRIM_TAG << 29);
@@ -220,7 +223,10 @@ Obj pairup(Obj vars, Obj vals) {
 }
 
 Obj bind(Obj vars, Obj vals, Obj env) {
-  return append(pairup(vars, vals), env);
+  if (objtype(vars) != PAIR_TAG)                // ((lambda l body) '(1 2 3)) => bind l/'(1 2 3)
+    return append(pairup(cons(vars, NIL), cons(vals, NIL)), env);
+  else                                          // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3
+    return append(pairup(vars, vals), env);
 }
 
 Obj bind1(Obj var, Obj value, Obj env) {
@@ -341,10 +347,12 @@ void init_env() {
   prim_proc = bind1(mksym("list"), mkprim(PRIM_LIST), prim_proc);
   prim_proc = bind1(mksym("number?"), mkprim(PRIM_NUMBERP), prim_proc);
   prim_proc = bind1(mksym("symbol?"), mkprim(PRIM_SYMBOLP), prim_proc);
+  prim_proc = bind1(mksym("null?"), mkprim(PRIM_NULLP), prim_proc);
 }
 
 // problem is mk_proc creates a list and adds a tag which is not a pair that CAR/CDR works on
 
+int is_num(expr)         { return NUM_TAG == objtype(expr); }
 int is_pair(expr)        { return PAIR_TAG == objtype(expr) && expr != NIL; }
 int is_self_evaluating() { return NUM_TAG == objtype(expr) || STR_TAG == objtype(expr) || BOOL_TAG == objtype(expr); }
 int is_variable()        { return SYMBOL_TAG == objtype(expr); }
@@ -366,6 +374,20 @@ void verify_list(Obj p, char *fcnname) {
   longjmp(jmpbuf, 1);
 }
 
+int ensure_numerical(Obj p, char *opname) {
+  if (is_num(p))
+    return objval(p);
+  printf("The object "); display(p);
+  printf(" passed as an argument of %s, is not of the correct type.\n", opname);
+  longjmp(jmpbuf, 1);
+}
+void prim_plus()  { val = mknum(ensure_numerical(car(argl), "+") + ensure_numerical(cadr(argl), "+")); }
+void prim_minus()  { val = mknum(ensure_numerical(car(argl), "-") - ensure_numerical(cadr(argl), "-")); }
+void prim_times()  { val = mknum(ensure_numerical(car(argl), "*") * ensure_numerical(cadr(argl), "*")); }
+void prim_eq()  { val = ensure_numerical(car(argl), "=") == ensure_numerical(cadr(argl), "=") ? True : False; }
+void prim_lt()  { val = ensure_numerical(car(argl), "<") < ensure_numerical(cadr(argl), "<") ? True : False; }
+void prim_gt()  { val = ensure_numerical(car(argl), ">") > ensure_numerical(cadr(argl), ">") ? True : False; }
+
 /* argl is a list of arguments (a1 a2 a3 .. aN) */
 /* if the primitive function only takes one argument, it is a1 */
 /* if the primitive function takes two arguments, they are a1 and a2 */
@@ -373,12 +395,8 @@ void prim_car()   { verify_list(argl, "car"); val = car(car(argl)); }
 void prim_cdr()   { verify_list(argl, "cdr"); val = cdr(car(argl)); }
 void prim_cons()  { val = cons(car(argl), cadr(argl)); }
 void prim_pairp() { val = is_pair(car(argl)) ? True : False; }
-void prim_plus()  { val = mknum(objval(car(argl)) + objval(cadr(argl))); } /* fixme: verify_num */
-void prim_minus() { val = mknum(objval(car(argl)) - objval(cadr(argl))); } /* fixme: verify_num */
-void prim_times() { val = mknum(objval(car(argl)) * objval(cadr(argl))); } /* fixme: verify_num */
-void prim_eq()    { val = (car(argl) == cadr(argl) ? True : False); }
-void prim_lt()    { val = (objval(car(argl)) < objval(cadr(argl)) ? True : False); } /* fixme: verify_num */
-void prim_gt()    { val = (objval(car(argl)) > objval(cadr(argl)) ? True : False); } /* fixme: verify_num */
+void prim_nullp() { val = (car(argl) == NIL ? True : False); }
+
 void prim_display() { display(car(argl)); }
 void prim_list()  { val = argl; } 
 void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
@@ -387,7 +405,7 @@ void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
 
 void (*primitives[])() = {
   prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq, prim_lt,
-  prim_gt, prim_display, prim_list, prim_numberp, prim_symbolp };
+  prim_gt, prim_display, prim_list, prim_numberp, prim_symbolp, prim_nullp };
 
 #include "debug.h"
 
@@ -452,7 +470,7 @@ void eval_dispatch() {
       display_registers("COMPOUND_APPLY");
       unev = car(objval(proc));      /* procedure parameters */
       env = caddr(objval(proc));     /* procedure environment */
-      env = bind(unev, argl, env);
+      env = bind(unev, argl, env);   /* bind formals to arguments */
       unev = cadr(objval(proc));     /* procedure body */
       label = EV_SEQUENCE;
       continue;
@@ -827,7 +845,7 @@ Obj parse_atom() {
 
 
 // Recursive-descent parser for S-expressions
-// sexp --> ID | NUM | "(" sexp ")" | "'" sexp
+// sexp --> ID | NUM | STRING | "(" sexp* ")" | "'" sexp
 
 Obj parse();
 
@@ -879,6 +897,9 @@ int main(int argc, char *argv[]) {
   init_env();
   fp = stdin;
 
+  if (setjmp(jmpbuf) == 1)
+    goto repl;
+
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] == '-') {
       if (argv[i][1] == 'v') {
@@ -912,7 +933,9 @@ int main(int argc, char *argv[]) {
   printf("%s\n", input);
   */
 
-  setjmp(jmpbuf);
+ repl:
+  fp = stdin;
+  printf("===> ");
   rep();
 
   if (verbose) {
