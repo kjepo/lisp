@@ -131,7 +131,17 @@ Also, there is a mechanism to capture a variable number of arguments: with
     (define list (lambda l l)
 ```
 all the arguments are bound to the formal parameter `l` so that
-`(list 1 2 3) ⇒ (1 2 3)`.
+`(list 1 2 3) ⇒ (1 2 3)`. Finally, the `body` of a `lambda` expression can be a list
+of expressions, for instance
+
+```
+(define *seed* 0)
+(define next
+  (lambda ()
+    (set! *seed* (+ *seed* 1))
+    *seed*))
+```
+Each invocation of `(next)` yields another integer `1`, `2`, `3`, etc.
 
 - `(procedure arg₁ arg₂  ...)` applies `procedure` to the arguments `arg₁`, `arg₂`, etc,
 where `procedure` is either the result of a `lambda` expression, or one of the built-in
