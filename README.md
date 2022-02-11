@@ -83,7 +83,7 @@ empty-list
 
 (define square
   (lambda (x)
-    (* x x))
+    (* x x)))
 ```
 
 The informal description of the language is as follows:
@@ -126,7 +126,7 @@ The parameter list is optional, i.e.,
 
 defines a function `foo` which when invoked with `(foo)` outputs `foo!`.
 - `(procedure arg₁ arg₂  ...)` applies `procedure` to the arguments `arg₁`, `arg₂`, etc,
-where `procedure` is either the result of a lambda expression, or one of the built-in
+where `procedure` is either the result of a `lambda` expression, or one of the built-in
 functions `car`, `cdr`, `cons`, `pair?`, `+`, `-`, `*`, `=`, `<`, `>`, `display`, `list`,
 `number?`, `symbol?`.
 
@@ -139,6 +139,9 @@ are a few things I'd like to do:
 - Change the boxed representation to use lsb for the tag.
 - Catch C-c and use GNU's readline library to parse input from stdin.
 - Add more primitives, for instance `let`, `cond`
+- `call/cc`
+- Special forms needed for `and`, `or`, `not`.
+- Macros
 
 # References
 
