@@ -27,6 +27,8 @@
 #include "hashtab.h"
 
 int verbose = 0;
+FILE *fp;
+char *progname;
 
 static jmp_buf jmpbuf;
 void error(char *s)   {
@@ -79,7 +81,7 @@ void unbound(Obj id) {
   longjmp(jmpbuf, 1);
 }
 
-#define MEMSIZE 4096
+#define MEMSIZE 8192
 
 Obj *thecars, *thecdrs, *newcars, *newcdrs;
 Obj free_index = 1;                    // can't start at 0 because 0 means NIL
@@ -383,7 +385,7 @@ void prim_nullp() { val = (car(argl) == NIL ? True : False); }
 void prim_display() { display(car(argl)); }
 void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
 void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
-void prim_exit()  { exit(0); }
+void prim_exit()  { longjmp(jmpbuf, 1); } /* fixme: maybe call this quit() and let exit do exit(0) ? */
 
 void (*primitives[])() = {
   prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq, prim_eqp,
@@ -628,8 +630,9 @@ void eval_dispatch() {
       continue;
 
     case PRINT_RESULT:
-      printf("===> ");
-      display(val); NL;
+      if (fp == stdin) {
+	display(val); NL;
+      }
       return;
 
     case UNKNOWN_EXPRESSION_TYPE:
@@ -670,13 +673,13 @@ void eval_dispatch() {
 }
 
 void eval() {
-  display(expr); NL;
+  //  display(expr); NL;
   eval_dispatch();
 }
 
 // scanner and parser for LISP-style input
 typedef enum toktype {
-  END, ID, NUM, STR, LPAR = '(', RPAR = ')', DOT = '.', PLUS = '+', MINUS = '-', TICK = '\''
+  END, ID, NUM, STR, CR, LPAR = '(', RPAR = ')', DOT = '.', PLUS = '+', MINUS = '-', TICK = '\''
 } Token;
 
 Token token;                    // current token
@@ -685,9 +688,6 @@ int nval;                       // numeric value when token == NUM
 
 int legal_symbol_start(char ch) { return isalpha(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }   
 int legal_symbol_rest(char ch) { return isalnum(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }   
-
-FILE *fp;
-char *progname;
 
 Token scan() {
   char *p;
@@ -824,6 +824,8 @@ void rep() {
   while ((expr = parse())) {
     env = prim_proc;
     eval();
+    if (fp == stdin)
+      printf("===> ");
   }
 }
 
@@ -841,6 +843,7 @@ void slurp(char *fname) {
 int main(int argc, char *argv[]) {
   char *usage = "usage: %s [-h] [-v] [filename ...]\n";
   progname = argv[0];
+  int libloaded = 0;
 
   thecars = (Obj *)malloc(MEMSIZE * sizeof(Obj));
   thecdrs = (Obj *)malloc(MEMSIZE * sizeof(Obj));  
@@ -854,14 +857,16 @@ int main(int argc, char *argv[]) {
   if (setjmp(jmpbuf) == 1)
     goto repl;
 
-  slurp("lib.scm");
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] == '-') {
-      if (argv[i][1] == 'v') {
+      if (argv[i][1] == 'q') {
+	libloaded = 1;
+      } else if (argv[i][1] == 'v') {
         verbose = 1;
       } else if (argv[i][1] == 'h') {
         fprintf(stderr, usage, progname);
 	fprintf(stderr, "\nThis LISP interpreter accepts the following commands:\n\n");
+	fprintf(stderr, "-q    Don't load lib.scm.\n\n");
 	fprintf(stderr, "-h    Prints this help message.\n\n");
 	fprintf(stderr, "-v    Turns on verbose mode which prints machine registers, memory and symbol table.\n\n");
 	fprintf(stderr, "The source for this project is at http://www.github.com/kjepo/lisp\n");
@@ -871,9 +876,18 @@ int main(int argc, char *argv[]) {
         exit(1);
       }
     } else {
+      if (!libloaded) {
+	slurp("lib.scm");
+	libloaded = 1;
+      }
       slurp(argv[i]);
       fp = stdin;
     }
+  }
+
+  if (!libloaded) {
+    slurp("lib.scm");
+    libloaded = 1;
   }
 
   /*
