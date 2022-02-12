@@ -79,10 +79,9 @@ void unbound(Obj id) {
   longjmp(jmpbuf, 1);
 }
 
-#define MEMSIZE 2048
+#define MEMSIZE 4096
 
-Obj thecars[MEMSIZE];
-Obj thecdrs[MEMSIZE];
+Obj *thecars, *thecdrs, *newcars, *newcdrs;
 Obj free_index = 1;                    // can't start at 0 because 0 means NIL
 Obj NIL = 0;
 
@@ -120,8 +119,8 @@ Obj mkproc(Obj parameters, Obj body, Obj env) {
 }
 
 typedef enum {
-  PRIM_CAR,  PRIM_CDR,  PRIM_CONS,  PRIM_PAIRP,  PRIM_PLUS,  PRIM_MINUS,  PRIM_TIMES,  PRIM_EQ,
-  PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP, PRIM_SYMBOLP, PRIM_NULLP } Primitive;
+  PRIM_CAR,  PRIM_CDR,  PRIM_CONS,  PRIM_PAIRP,  PRIM_PLUS,  PRIM_MINUS,  PRIM_TIMES,  PRIM_EQ, PRIM_EQP,
+  PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP, PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT } Primitive;
 
 Obj mkprim(Primitive p) { return p | (PRIM_TAG << 29); }
 
@@ -319,16 +318,18 @@ void init_env() {
   prim_proc = bind1(mksym("cdr"), mkprim(PRIM_CDR), prim_proc);
   prim_proc = bind1(mksym("cons"), mkprim(PRIM_CONS), prim_proc);
   prim_proc = bind1(mksym("pair?"), mkprim(PRIM_PAIRP), prim_proc);
-  prim_proc = bind1(mksym("+"), mkprim(PRIM_PLUS), prim_proc);
-  prim_proc = bind1(mksym("-"), mkprim(PRIM_MINUS), prim_proc);
-  prim_proc = bind1(mksym("*"), mkprim(PRIM_TIMES), prim_proc);
-  prim_proc = bind1(mksym("="), mkprim(PRIM_EQ), prim_proc);
+  prim_proc = bind1(mksym("plus"), mkprim(PRIM_PLUS), prim_proc);
+  prim_proc = bind1(mksym("minus"), mkprim(PRIM_MINUS), prim_proc);
+  prim_proc = bind1(mksym("times"), mkprim(PRIM_TIMES), prim_proc);
+  prim_proc = bind1(mksym("=="), mkprim(PRIM_EQ), prim_proc);  // ??
+  prim_proc = bind1(mksym("eq?"), mkprim(PRIM_EQP), prim_proc);
   prim_proc = bind1(mksym("<"), mkprim(PRIM_LT), prim_proc);
   prim_proc = bind1(mksym(">"), mkprim(PRIM_GT), prim_proc);
   prim_proc = bind1(mksym("display"), mkprim(PRIM_DISPLAY), prim_proc);
   prim_proc = bind1(mksym("number?"), mkprim(PRIM_NUMBERP), prim_proc);
   prim_proc = bind1(mksym("symbol?"), mkprim(PRIM_SYMBOLP), prim_proc);
   prim_proc = bind1(mksym("null?"), mkprim(PRIM_NULLP), prim_proc);
+  prim_proc = bind1(mksym("exit"), mkprim(PRIM_EXIT), prim_proc);
 }
 
 int is_num(Obj p)        { return NUM_TAG == objtype(p); }
@@ -373,20 +374,20 @@ void prim_gt()  { val = ensure_numerical(car(argl), ">") > ensure_numerical(cadr
 /* argl is a list of arguments (a1 a2 a3 .. aN) */
 /* if the primitive function only takes one argument, it is a1 */
 /* if the primitive function takes two arguments, they are a1 and a2 */
+void prim_eqp()   { val = car(argl) == cadr(argl) ? True : False; }
 void prim_car()   { verify_list(argl, "car"); val = car(car(argl)); }
 void prim_cdr()   { verify_list(argl, "cdr"); val = cdr(car(argl)); }
 void prim_cons()  { val = cons(car(argl), cadr(argl)); }
 void prim_pairp() { val = is_pair(car(argl)) ? True : False; }
 void prim_nullp() { val = (car(argl) == NIL ? True : False); }
-
 void prim_display() { display(car(argl)); }
 void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
 void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
-
+void prim_exit()  { exit(0); }
 
 void (*primitives[])() = {
-  prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq, prim_lt,
-  prim_gt, prim_display, prim_numberp, prim_symbolp, prim_nullp };
+  prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq, prim_eqp,
+  prim_lt, prim_gt, prim_display, prim_numberp, prim_symbolp, prim_nullp, prim_exit };
 
 #include "debug.h"
 
@@ -840,6 +841,11 @@ void slurp(char *fname) {
 int main(int argc, char *argv[]) {
   char *usage = "usage: %s [-h] [-v] [filename ...]\n";
   progname = argv[0];
+
+  thecars = (Obj *)malloc(MEMSIZE * sizeof(Obj));
+  thecdrs = (Obj *)malloc(MEMSIZE * sizeof(Obj));  
+  newcars = (Obj *)malloc(MEMSIZE * sizeof(Obj));
+  newcdrs = (Obj *)malloc(MEMSIZE * sizeof(Obj));
 
   init_symbols();
   init_env();

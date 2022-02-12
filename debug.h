@@ -26,13 +26,11 @@ void display2(Obj expr, int dotted) {
     printf("%d", objval(expr));
     break;
   case PROC_TAG:
-    //    printf("<procedure %d>", objval(expr));
-    printf("<");
     if (expr && car(objval(expr))) {
       printf("λ");
       display(car(objval(expr)));
     } else
-      printf("NULL");
+      printf("λ()");
     printf(".");
     if (expr && cdr(objval(expr)) && cadr(objval(expr)))
       display(cadr(objval(expr)));
@@ -45,7 +43,6 @@ void display2(Obj expr, int dotted) {
     else
       printf("NULL");
     */
-    printf(">");
     break;
   case PRIM_TAG:
     printf("<primitive #%d>", objval(expr));
