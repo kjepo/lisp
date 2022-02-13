@@ -129,3 +129,7 @@
     (- n 1)))
 
 (assert (-1+ 3) 2)
+
+(define newline
+  (lambda ()
+    (display "\n")))

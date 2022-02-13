@@ -1,17 +1,14 @@
 /**
- **  Simple explicit-control register-machine Scheme-like interpreter
- **  Written in 2022 by Kjell Post (but a dormant project since 1986)
- **
- **/ 
-
-/**
+  * Simple explicit-control register-machine Scheme-like interpreter
+  * Written in 2022 by Kjell Post (but a dormant project since 1986)
+  *
   * List of things to implement:
   *
   * Dotted pairs can't be read
+  * One token lookahead prevents friendly REPL
   * Catch C-c to stop interpreter and return to REPL
   * Replace magic numbers in objval and mknum in terms of NUM_TAG
   * Write garbage collector
-  * Special forms and, or, not that doesn't evaluate arguments unnecessarily
   * call/cc
   *
  **/
@@ -81,7 +78,7 @@ void unbound(Obj id) {
   longjmp(jmpbuf, 1);
 }
 
-#define MEMSIZE 8192
+#define MEMSIZE 16384
 
 Obj *thecars, *thecdrs, *newcars, *newcdrs;
 Obj free_index = 1;                    // can't start at 0 because 0 means NIL
@@ -95,11 +92,6 @@ Obj NIL = 0;
 #define caddr(p) (car(cdr(cdr(p))))
 #define cadddr(p) (car(cdr(cdr(cdr(p)))))
 
-Obj mknum(int n) { return (n & 0x1fffffff) | (NUM_TAG << 29); }
-Obj mkstr(char *str) { return lookup(str) | (STR_TAG << 29); }
-Obj mksym(char *id) { return lookup(id) | (SYMBOL_TAG << 29); }
-Obj mkbool(char *id) { return lookup(id) | (BOOL_TAG << 29); }
-
 Obj cons(Obj car_, Obj cdr_) {  /* aka mkpair */
   if (free_index > MEMSIZE)
       error("Error: memory full!");
@@ -108,91 +100,40 @@ Obj cons(Obj car_, Obj cdr_) {  /* aka mkpair */
   return free_index++ | (PAIR_TAG << 29);
 }
 
-Obj list(Obj p) { return cons(p, NIL); }
-
-Obj append(Obj l, Obj m) { return (l == NIL ? m : cons(car(l), append(cdr(l), m))); }
-
-Obj adjoin_arg(Obj arg, Obj arglist) { return append(arglist, list(arg)); }
-
-Obj mkproc(Obj parameters, Obj body, Obj env) {
-  /* a procedure is a triple (parameters body env) */
-  Obj p = cons(parameters, cons(body, cons(env, NIL)));
-  return objval(p) | (PROC_TAG << 29);
-}
-
 typedef enum {
   PRIM_CAR,  PRIM_CDR,  PRIM_CONS,  PRIM_PAIRP,  PRIM_PLUS,  PRIM_MINUS,  PRIM_TIMES,  PRIM_EQ, PRIM_EQP,
   PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP, PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT } Primitive;
 
+Obj mknum(int n) { return (n & 0x1fffffff) | (NUM_TAG << 29); }
+Obj mkstr(char *str) { return lookup(str) | (STR_TAG << 29); }
+Obj mksym(char *id) { return lookup(id) | (SYMBOL_TAG << 29); }
+Obj mkbool(char *id) { return lookup(id) | (BOOL_TAG << 29); }
 Obj mkprim(Primitive p) { return p | (PRIM_TAG << 29); }
+Obj mkproc(Obj parameters, Obj body, Obj env) { // a procedure is a triple (parameters body env) */
+  Obj p = cons(parameters, cons(body, cons(env, NIL)));
+  return objval(p) | (PROC_TAG << 29);
+}
+
+Obj append(Obj l, Obj m) { return (l == NIL ? m : cons(car(l), append(cdr(l), m))); }
+Obj adjoin_arg(Obj arg, Obj arglist) { return append(arglist, cons(arg, NIL)); }
 
 Obj TRUE_SYM, IF_SYM, EQ_SYM, LET_SYM, ADD_SYM, SUB_SYM,
   MUL_SYM, DIV_SYM, DEFINE_SYM, CAR_SYM, CDR_SYM, CONS_SYM, ATOM_SYM,
   QUOTE_SYM, LETREC_SYM, LAMBDA_SYM, SETBANG_SYM, BEGIN_SYM;
 
-typedef enum {
-  PRINT_RESULT,                 /* 0 */
-  EV_IF_DECIDE,
-  EV_IF_CONSEQUENT,
-  EV_IF_ALTERNATIVE,
-  EV_ASSIGNMENT_1,              
-  EV_DEFINITION_1,              
-  EV_APPL_DID_OPERATOR,         
-  EV_APPL_ACCUMULATE_ARG,       
-  EV_APPL_ACCUM_LAST_ARG,       
-  EV_SEQUENCE_CONTINUE,         
-  EVAL_DISPATCH,                /* 10 */
-  EV_SELF_EVAL,                 
-  EV_VARIABLE,                  
-  EV_QUOTED,                    
-  EV_IF,                        
-  EV_ASSIGNMENT,                
-  EV_DEFINITION,                
-  EV_LAMBDA,                    
-  EV_BEGIN,
-  EV_APPLICATION,
-  EV_APPL_OPERAND_LOOP,         /* 20 */
-  EV_APPL_LAST_ARG,
-  EV_SEQUENCE,
-  EV_SEQUENCE_LAST_EXP,
-  APPLY_DISPATCH,
-  PRIMITIVE_APPLY,
-  COMPOUND_APPLY,
-  UNKNOWN_PROCEDURE_TYPE,  
-  UNKNOWN_EXPRESSION_TYPE       /* 28 */
-} Continuation;
+typedef enum {  PRINT_RESULT, EV_IF_DECIDE, EV_IF_CONSEQUENT, EV_IF_ALTERNATIVE, EV_ASSIGNMENT_1,              
+  EV_DEFINITION_1, EV_APPL_DID_OPERATOR, EV_APPL_ACCUMULATE_ARG, EV_APPL_ACCUM_LAST_ARG, EV_SEQUENCE_CONTINUE,
+  EVAL_DISPATCH, EV_SELF_EVAL, EV_VARIABLE, EV_QUOTED, EV_IF, EV_ASSIGNMENT, EV_DEFINITION, EV_LAMBDA, EV_BEGIN,
+  EV_APPLICATION, EV_APPL_OPERAND_LOOP, EV_APPL_LAST_ARG, EV_SEQUENCE, EV_SEQUENCE_LAST_EXP, APPLY_DISPATCH,
+  PRIMITIVE_APPLY, COMPOUND_APPLY, UNKNOWN_PROCEDURE_TYPE, UNKNOWN_EXPRESSION_TYPE } Continuation;
 
 char *continuation_string[] = {
-  "PRINT_RESULT",
-  "EV_IF_DECIDE",
-  "EV_IF_CONSEQUENT",
-  "EV_IF_ALTERNATIVE",
-  "EV_ASSIGNMENT_1",
-  "EV_DEFINITION_1",
-  "EV_APPL_DID_OPERATOR",
-  "EV_APPL_ACCUMULATE_ARG",
-  "EV_APPL_ACCUM_LAST_ARG",
-  "EV_SEQUENCE_CONTINUE",
-  "EVAL_DISPATCH",
-  "EV_SELF_EVAL",
-  "EV_VARIABLE",
-  "EV_QUOTED",
-  "EV_IF",
-  "EV_ASSIGNMENT",
-  "EV_DEFINITION",
-  "EV_LAMBDA",
-  "EV_BEGIN",
-  "EV_APPLICATION",
-  "EV_APPL_OPERAND_LOOP",
-  "EV_APPL_LAST_ARG",
-  "EV_SEQUENCE",
-  "EV_SEQUENCE_LAST_EXP",
-  "APPLY_DISPATCH",
-  "PRIMITIVE_APPLY",
-  "COMPOUND_APPLY",
-  "UNKNOWN_PROCEDURE_TYPE",
-  "UNKNOWN_EXPRESSION_TYPE"
-};
+  "PRINT_RESULT", "EV_IF_DECIDE", "EV_IF_CONSEQUENT", "EV_IF_ALTERNATIVE", "EV_ASSIGNMENT_1", "EV_DEFINITION_1",
+  "EV_APPL_DID_OPERATOR", "EV_APPL_ACCUMULATE_ARG", "EV_APPL_ACCUM_LAST_ARG", "EV_SEQUENCE_CONTINUE",
+  "EVAL_DISPATCH", "EV_SELF_EVAL", "EV_VARIABLE", "EV_QUOTED", "EV_IF", "EV_ASSIGNMENT", "EV_DEFINITION", 
+  "EV_LAMBDA", "EV_BEGIN", "EV_APPLICATION", "EV_APPL_OPERAND_LOOP", "EV_APPL_LAST_ARG", "EV_SEQUENCE",
+  "EV_SEQUENCE_LAST_EXP", "APPLY_DISPATCH", "PRIMITIVE_APPLY", "COMPOUND_APPLY", "UNKNOWN_PROCEDURE_TYPE",
+  "UNKNOWN_EXPRESSION_TYPE" };
 
 Continuation cont, label;
 Obj Stack[100];
@@ -213,10 +154,6 @@ Obj bind(Obj vars, Obj vals, Obj env) {
     return append(pairup(cons(vars, NIL), cons(vals, NIL)), env);
   else                                          // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3 
     return append(pairup(vars, vals), env);
-}
-
-Obj bind1(Obj var, Obj value, Obj env) {
-  return cons(cons(var, value), env);
 }
 
 void prepend(Obj x, Obj l) {
@@ -313,25 +250,25 @@ Obj prim_proc;
 void init_env() {
   // an environment BINDING id -> value is represented simply as cons(id, value)
   // an ENVIRONMENT is a list of bindings ( ( id . value ) ( id . value ) .... )
-  prim_proc = NIL;
-  prim_proc = bind1(mksym("#f"), False, prim_proc);
-  prim_proc = bind1(mksym("#t"), True, prim_proc);
-  prim_proc = bind1(mksym("car"), mkprim(PRIM_CAR), prim_proc);
-  prim_proc = bind1(mksym("cdr"), mkprim(PRIM_CDR), prim_proc);
-  prim_proc = bind1(mksym("cons"), mkprim(PRIM_CONS), prim_proc);
-  prim_proc = bind1(mksym("pair?"), mkprim(PRIM_PAIRP), prim_proc);
-  prim_proc = bind1(mksym("plus"), mkprim(PRIM_PLUS), prim_proc);
-  prim_proc = bind1(mksym("minus"), mkprim(PRIM_MINUS), prim_proc);
-  prim_proc = bind1(mksym("times"), mkprim(PRIM_TIMES), prim_proc);
-  prim_proc = bind1(mksym("=="), mkprim(PRIM_EQ), prim_proc);  // ??
-  prim_proc = bind1(mksym("eq?"), mkprim(PRIM_EQP), prim_proc);
-  prim_proc = bind1(mksym("<"), mkprim(PRIM_LT), prim_proc);
-  prim_proc = bind1(mksym(">"), mkprim(PRIM_GT), prim_proc);
-  prim_proc = bind1(mksym("display"), mkprim(PRIM_DISPLAY), prim_proc);
-  prim_proc = bind1(mksym("number?"), mkprim(PRIM_NUMBERP), prim_proc);
-  prim_proc = bind1(mksym("symbol?"), mkprim(PRIM_SYMBOLP), prim_proc);
-  prim_proc = bind1(mksym("null?"), mkprim(PRIM_NULLP), prim_proc);
-  prim_proc = bind1(mksym("exit"), mkprim(PRIM_EXIT), prim_proc);
+  prim_proc = cons(NIL, NIL);  // can't be NIL (make space for 1 binding)
+  add_binding(mksym("#f"), False, prim_proc);
+  add_binding(mksym("#t"), True, prim_proc);
+  add_binding(mksym("car"), mkprim(PRIM_CAR), prim_proc);
+  add_binding(mksym("cdr"), mkprim(PRIM_CDR), prim_proc);
+  add_binding(mksym("cons"), mkprim(PRIM_CONS), prim_proc);
+  add_binding(mksym("pair?"), mkprim(PRIM_PAIRP), prim_proc);
+  add_binding(mksym("plus"), mkprim(PRIM_PLUS), prim_proc);
+  add_binding(mksym("minus"), mkprim(PRIM_MINUS), prim_proc);
+  add_binding(mksym("times"), mkprim(PRIM_TIMES), prim_proc);
+  add_binding(mksym("=="), mkprim(PRIM_EQ), prim_proc);  // ??
+  add_binding(mksym("eq?"), mkprim(PRIM_EQP), prim_proc);
+  add_binding(mksym("<"), mkprim(PRIM_LT), prim_proc);
+  add_binding(mksym(">"), mkprim(PRIM_GT), prim_proc);
+  add_binding(mksym("display"), mkprim(PRIM_DISPLAY), prim_proc);
+  add_binding(mksym("number?"), mkprim(PRIM_NUMBERP), prim_proc);
+  add_binding(mksym("symbol?"), mkprim(PRIM_SYMBOLP), prim_proc);
+  add_binding(mksym("null?"), mkprim(PRIM_NULLP), prim_proc);
+  add_binding(mksym("exit"), mkprim(PRIM_EXIT), prim_proc);
 }
 
 int is_num(Obj p)        { return NUM_TAG == objtype(p); }
@@ -834,7 +771,7 @@ void slurp(char *fname) {
     fprintf(stderr, "%s: could not open %s\n", progname, fname);
     exit(1);
   } else {
-    printf("parsing %s...\n", fname);
+    printf("reading %s...\n", fname);
     rep();
     fp = stdin;
   }
@@ -889,12 +826,7 @@ int main(int argc, char *argv[]) {
     slurp("lib.scm");
     libloaded = 1;
   }
-
-  /*
-  printf("testing readline:\n");
-  char* input = readline("prompt> ");
-  printf("%s\n", input);
-  */
+  //  printf("testing readline:\n");  char* input = readline("prompt> ");  printf("%s\n", input);
 
  repl:
   fp = stdin;
