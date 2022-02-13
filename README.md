@@ -9,81 +9,29 @@ arguments explicit.  The code is based on SICP, chapter 5 (and forwards).
 
 The goal is now to write the same code in C (file `lisp.c`).
 The code is not finished yet but a rudimentary interpreter is working
-and can handle the examples below.
+and can load the library file `lib.scm`.  Here is a another small example:
 
 ```
-(define id (lambda (x) x))
-(id 42)
-(define k (lambda (x y) x))
-(k 1 2)
-(define s (lambda (x y z) (x z (y z))))
-(s k k 17)
-
-42
-(quote 17)
-(quote (1 2 3))
-x
-(set! x 22)
-(define l123 (quote (1 2 3)))
-#t
-#f
-(if #t (quote a) (quote b))
-(if #f (quote a) (quote b))
-(if 42 (quote a) (quote b))
-(car (quote (1 2 3)))
-(cdr (quote (1 2 3)))
-((if #f + *) 2 3)
-(begin (define u 42) (set! u 99) u)
-
 ;;; zero? returns #t if x is zero, #f otherwise
 (define zero?
   (lambda (n)
-    (= n 0)))
+    (eq? n 0)))
 
 (define -1+
   (lambda (n)
     (+ n -1)))
 
 ;;; recursive factorial function
-;;; this lisp interpreter can compute up to 12!
+;;; this lisp interpreter can compute up to 11!
 (define fact
   (lambda (n)
     (if (zero? n)
         1
         (* n (fact (-1+ n))))))
 
-(fact 10)
-
-(list 1 2 3)
-(list (* 3 3) (* 4 4))
-(list 'a 1 '(3 1 4))
-
-'a
-(car '(1 2 3))
-(define empty-list '())
-empty-list
-(cons 1 empty-list)
-
-(number? 1)
-(number? 'a)
-(number? (list 1 2 3))
-(symbol? 1)
-(symbol? 'a)
-(symbol? (list 1 2 3))
-
-(define sign
-  (lambda (n)
-    (if (< n 0) -1 1)))
-
-(sign 17)
-(sign -42)
-
-(display "Hello, world\nThis is a tab\tcharacter")
-(+ (* 3 (+ (* 2 4) (+ 3 5))) (+ (- 10 7) 6)) ; ==> 57
-
-(define square
-  (lambda (x)
-    (* x x)))
+(display "11! = ")
+(display (fact 11))
+(newline)
 ```
 
 The informal description of the language is as follows:
@@ -147,6 +95,70 @@ Each invocation of `(next)` yields another integer `1`, `2`, `3`, etc.
 where `procedure` is either the result of a `lambda` expression, or one of the built-in
 functions `car`, `cdr`, `cons`, `pair?`, `+`, `-`, `*`, `=`, `<`, `>`, `display`, `list`,
 `number?`, `symbol?`.
+
+# Tagged pointers
+
+The interpreter handles _objects_ which can be 
+- pairs of objects, i.e., cons cells
+- symbols, i.e., `foo`, `-1+`, or `set!`
+- numbers, i.e., `42`, `-17` or `+3`
+- procedures, which are the result of evaluating `lambda`-expressions
+- primitives, i.e., `car`, `cdr`, `cons`, etc
+- strings, i.e., `"hello world\n"`
+- booleans, i.e., `#t` and `#f`
+- arrays (not yet implemented)
+
+These objects are stored in 32-bit integers, but to separate them we use 3 bits as a tag for the 8 
+different kinds of objects. The tag can be stored in the lower 3 bits or in the 3 most significant bits.
+The trade-offs between these are:
+
+
+## Store the tag in the most significant bits
+
+```
+tttbbbbb bbbbbbbb bbbbbbbb bbbbbbbb
+```
+
+- To determine the type, we need to shift the value 29 bits to the right, `(n >> 29) & 7`.
+
+- To use the value, we need to mask off the three most significant bits, i.e., `n & 0x1fffffff`.
+
+For pairs, we use the tag `000` so that we can use the tagged value "as-is".  This saves some
+time when manipulating lists with `car`, `cdr` and `cons`.
+
+For integers, it gets complicated: a negative integer in 2's complement format must have its
+most significant bits set to 1 again after removing the tag.
+
+If the tag for numbers is `111` then 17 is stored as `11100000 00000000 00000000 00010001`
+while -17 is stored as `11111111 11111111 11111111 11101111`. So in order to get the value 
+back, we must do different things depending on whether the 28th bit (4th bit from the left)
+is 0 or 1: if it is 0 then we are storing a positive number and we simply set bits 29-32 to 0
+to turn it into 17 again.
+But if the 28th bit is 1, then we are storing a negative number and we set bits 29-32 to 1
+to turn it back to -17.
+(If the tag is `111` there is no need for the last operation, but we still need to examine 
+the 28th bit every time we need the integer value.) So the largest number we can store is 
+268435455 which is stored as `11101111 11111111 11111111 11111111`. The smallest number we 
+can store is -268435456 which is stored as `11110000 00000000 00000000 00000000`.
+
+## Store the tag in the least significant bits
+
+```
+bbbbbbbb bbbbbbbb bbbbbbbb bbbbbttt
+```
+
+- To determine the type, we need to mask off the first thre bits, i.e., `n & 7`.
+
+- To use the value, we need to shift the tagged value three bits to right, i.e., `n >> 3`.
+
+For pairs, we would have to shift the value three bits to the right before using it.  This is 
+a small extra cost we need to pay every time we follow the car/cdr of a cons cell and 
+makes traversing a list more time consuming.
+
+For integers, we wouldn't have to keep track of the sign bit for negative numbers but we
+must of course also shift the tagged value three bits to the right before using it.
+We _could_ use `000` as the tag for numbers and apply addition, subtraction, etc on the 
+tagged numbers but LISP program typically don't do a lot of number crunching.
 
 # Future plans
 
