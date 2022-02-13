@@ -80,10 +80,7 @@
 (assert (- 10 1) 9)
 (assert (- 10 1 2) 7)
 
-
-
-
-;;; (+ t_1 t_2 ... t_n) => t_1 * t_2 * ... t_n
+;;; (* t_1 t_2 ... t_n) => t_1 * t_2 * ... t_n
 (define *
   (lambda l
     (foldl times l 1)))
