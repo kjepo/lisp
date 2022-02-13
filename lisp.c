@@ -777,6 +777,8 @@ void slurp(char *fname) {
   }
 }
 
+void printBits(size_t const size, void const * const ptr);
+
 int main(int argc, char *argv[]) {
   char *usage = "usage: %s [-h] [-v] [filename ...]\n";
   progname = argv[0];
@@ -786,6 +788,13 @@ int main(int argc, char *argv[]) {
   thecdrs = (Obj *)malloc(MEMSIZE * sizeof(Obj));  
   newcars = (Obj *)malloc(MEMSIZE * sizeof(Obj));
   newcdrs = (Obj *)malloc(MEMSIZE * sizeof(Obj));
+
+
+  Obj p = mknum(268435455);
+  printBits(4, &p);
+  NL;
+  printf("%d\n", objval(p));
+
 
   init_symbols();
   init_env();

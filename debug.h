@@ -26,14 +26,14 @@ void display2(Obj expr, int dotted) {
     printf("%d", objval(expr));
     break;
   case PROC_TAG:
-    if (expr && car(objval(expr))) {
+    if (expr && car(expr)) {
       printf("λ");
-      display(car(objval(expr)));
+      display(car(expr));
     } else
       printf("λ()");
     printf(".");
-    if (expr && cdr(objval(expr)) && cadr(objval(expr)))
-      display(cadr(objval(expr)));
+    if (expr && cdr(expr) && cadr(expr))
+      display(cadr(expr));      
     else
       printf("NULL");
     printf(",env");
@@ -131,10 +131,8 @@ void dump_memory() {
   for (last = MEMSIZE; last >= 0; last--)
     if (car(last))
       break;
-  for (i = 0; i < last; i+= 12) {
+  for (i = 0; i < last; i+= 12)
     dump_memory2(i, i+12);
-    //    NL;
-  }
 }
 
 // Assumes little endian
