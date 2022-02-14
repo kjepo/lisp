@@ -1,13 +1,15 @@
 # explicit LISP
 
-This is an exercise in building a LISP machine.
+This is an exercise in building a LISP machine in a series of steps
+so that ultimately we _could_ write it in assembler.
 
 The code in `explicit.scm` is a register machine implementation
-of a LISP interpreter. Rather than the usual recursive apply/eval
-description of the interpreter, we have made the control and
-arguments explicit.  The code is based on SICP, chapter 5 (and forwards).
+of a LISP interpreter written in Scheme.
+Rather than the usual recursive apply/eval description of the interpreter,
+we have made the control and arguments explicit.
+The code is based on SICP, chapter 5 (and forwards).
 
-The goal is now to write the same code in C (file `lisp.c`).
+The next step is to write the same code in C (file `lisp.c`).
 The code is not finished yet but a rudimentary interpreter is working
 and can load the library file `lib.scm`.  Here is a another small example:
 
@@ -177,12 +179,11 @@ While I'm not aiming to write a fully fledged Scheme interpreter there
 are a few things I'd like to do:
 
 - Add garbage collection
-- Change the boxed representation to use lsb for the tag.
 - Catch C-c and use GNU's readline library to parse input from stdin.
-- Add more primitives, for instance `let`, `cond`
 - `call/cc`
 - Special forms needed for `and`, `or`, `not`.
 - Macros
+- Add more primitives, for instance `let`, `cond`
 
 # References
 
