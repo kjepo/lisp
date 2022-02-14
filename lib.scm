@@ -19,22 +19,22 @@
 (define equal?
   (lambda (x y)
     (if (binary-and (pair? x) (pair? y))
-	(binary-and (equal? (car x) (car y))
-		    (equal? (cdr x) (cdr y)))
-	(eq? x y))))
+        (binary-and (equal? (car x) (car y))
+                    (equal? (cdr x) (cdr y)))
+        (eq? x y))))
 
 ;;; (assert x y) => #t if x == y, otherwise abort
 (define assert
   (lambda (x y)
     (if (equal? x y)
-	#t
-	(begin
-	  (display "*** assertion failed, line ")
-	  (display (car (file)))
-	  (display " in file ")
-	  (display (car (cdr (file))))
-	  (newline)
-	  (exit)))))
+        #t
+        (begin
+          (display "*** assertion failed, line ")
+          (display (car (file)))
+          (display " in file ")
+          (display (car (cdr (file))))
+          (newline)
+          (exit)))))
 
 ;;; some basic sanity checking of built-in functions
 (assert (car (cons 1 2)) 1)
@@ -59,8 +59,8 @@
 (define length
   (lambda (l)
     (if (null? l)
-	0
-	(plus 1 (length (cdr l))))))
+        0
+        (plus 1 (length (cdr l))))))
 
 (assert (length '(1 2 3)) 3)
 
@@ -77,8 +77,8 @@
 (define foldl
   (lambda (f l base)
     (if (null? l)
-	base
-	(f (car l) (foldl f (cdr l) base)))))	
+        base
+        (f (car l) (foldl f (cdr l) base)))))   
 
 ;;; (+ t_1 t_2 ... t_n) => t_1 + t_2 + ... t_n
 (define +
@@ -90,12 +90,12 @@
 (define -
   (lambda l
     (if (eq? (length l) 0)
-	(begin
-	  (display "error: - requires at least one argument\n")
-	  (exit))
-	(if (eq? (length l) 1)
-	    (minus 0 (car l))
-	    (minus (car l) (foldl plus (cdr l) 0))))))
+        (begin
+          (display "error: - requires at least one argument\n")
+          (exit))
+        (if (eq? (length l) 1)
+            (minus 0 (car l))
+            (minus (car l) (foldl plus (cdr l) 0))))))
 
 (assert (- 3) -3)
 (assert (- -3) 3)
@@ -152,8 +152,8 @@
 (define abs
   (lambda (n)
     (if (< n 0)
-	(- n)
-	n)))
+        (- n)
+        n)))
 
 (assert (equal? 'a 'a) #t)
 (assert (equal? 'a 'b) #f)
@@ -170,8 +170,8 @@
 (define map
   (lambda (f l)
     (if (null? l)
-	'()
-	(cons (f (car l)) (map f (cdr l))))))
+        '()
+        (cons (f (car l)) (map f (cdr l))))))
 
 (assert (map abs '(-3 1 -4)) '(3 1 4))
 
