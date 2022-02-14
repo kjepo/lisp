@@ -10,6 +10,9 @@
   * Write garbage collector
   * call/cc
   *
+  * (car line) works, where is the error check?
+  * when reporting "missing )", also show line number and file name
+  *
  **/
 
 #include <stdio.h>
@@ -32,8 +35,11 @@ char *continuation_string[] = {
   "UNKNOWN_EXPRESSION_TYPE" };
 
 int verbose = 0;
+char *fname;
 FILE *fp;
+int lineno;
 char *progname;
+
 
 static jmp_buf jmpbuf;
 void error(char *s)   {
@@ -72,7 +78,7 @@ Obj cons(Obj car_, Obj cdr_) {  /* aka mkpair */
 
 typedef enum {
   PRIM_CAR,  PRIM_CDR,  PRIM_CONS,  PRIM_PAIRP,  PRIM_PLUS,  PRIM_MINUS,  PRIM_TIMES,  PRIM_EQ, PRIM_EQP,
-  PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP, PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT } Primitive;
+  PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP, PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT, PRIM_FILE } Primitive;
 
 Obj mknum(int n) { return (n << 3) | NUM_TAG; }
 Obj mkstr(char *str) { return ((lookup(str)) << 3) | STR_TAG; }
@@ -221,6 +227,7 @@ void init_env() {
   add_binding(mksym("symbol?"), mkprim(PRIM_SYMBOLP), prim_proc);
   add_binding(mksym("null?"), mkprim(PRIM_NULLP), prim_proc);
   add_binding(mksym("exit"), mkprim(PRIM_EXIT), prim_proc);
+  add_binding(mksym("file"), mkprim(PRIM_FILE), prim_proc);
 }
 
 int is_num(Obj p)        { return NUM_TAG == objtype(p); }
@@ -275,10 +282,11 @@ void prim_display() { display(car(argl)); }
 void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
 void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
 void prim_exit()    { longjmp(jmpbuf, 1); } /* fixme: maybe call this quit() and let exit do exit(0) ? */
+void prim_file()    { val = cons(mknum(lineno), cons(mkstr(fname), NIL)); }
 
 void (*primitives[])() = {
   prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq, prim_eqp,
-  prim_lt, prim_gt, prim_display, prim_numberp, prim_symbolp, prim_nullp, prim_exit };
+  prim_lt, prim_gt, prim_display, prim_numberp, prim_symbolp, prim_nullp, prim_exit, prim_file };
 
 void eval_dispatch() {
   label = EVAL_DISPATCH;
@@ -584,12 +592,16 @@ Token scan() {
   do {                          /* skip whitespace */
     if (EOF == (ch = fgetc(fp)))
       return token = END;
+    if (ch == '\n')
+      lineno++;
   } while (isspace(ch));
 
   if (ch == ';') {             /* ; means comment until end-of-line */
     do {
       if (EOF == (ch = fgetc(fp)))
         return token = END;
+    if (ch == '\n')
+      lineno++;
     } while (ch != '\n');
     goto start_scan;
   }
@@ -707,6 +719,7 @@ Obj parse() {
 }
 
 void rep() {
+  lineno = 0;
   scan();
   while ((expr = parse())) {
     //    printf("Evaluates to: "); 
@@ -718,7 +731,8 @@ void rep() {
   }
 }
 
-void slurp(char *fname) {
+void slurp(char *f) {
+  fname = f;
   if (!(fp = fopen(fname, "r"))) {
     fprintf(stderr, "%s: could not open %s\n", progname, fname);
     exit(1);
@@ -742,6 +756,7 @@ int main(int argc, char *argv[]) {
   init_symbols();
   init_env();
   fp = stdin;
+  fname = "stdin";
 
   if (setjmp(jmpbuf) == 1)
     goto repl;
@@ -771,6 +786,7 @@ int main(int argc, char *argv[]) {
       }
       slurp(argv[i]);
       fp = stdin;
+      fname = "stdin";
     }
   }
 
@@ -782,6 +798,7 @@ int main(int argc, char *argv[]) {
 
  repl:
   fp = stdin;
+  fname = "stdin";
   printf("===> ");
   rep();
 

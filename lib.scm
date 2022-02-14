@@ -1,3 +1,7 @@
+(define newline
+  (lambda ()
+    (display "\n")))
+
 ;;; (binary-and x y) => x && y
 (define binary-and
   (lambda (x y)
@@ -22,7 +26,11 @@
     (if (equal? x y)
 	#t
 	(begin
-	  (display "*** assert failed\n")
+	  (display "*** assertion failed, line ")
+	  (display (car (file)))
+	  (display " in file ")
+	  (display (car (cdr (file))))
+	  (newline)
 	  (exit)))))
 
 ;;; some basic sanity checking of built-in functions
@@ -138,10 +146,6 @@
 
 (assert (-1+ 3) 2)
 
-(define newline
-  (lambda ()
-    (display "\n")))
-
 (define abs
   (lambda (n)
     (if (< n 0)
@@ -166,4 +170,4 @@
 	'()
 	(cons (f (car l)) (map f (cdr l))))))
 
-(assert (map abs '(-3 1 -4 1 -5 9 -2 6 -5 3 -5)) '(3 1 4 1 5 9 2 6 5 3 5))
+(assert (map abs '(-3 1 -4)) '(3 1 4))
