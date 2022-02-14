@@ -93,8 +93,15 @@ Each invocation of `(next)` yields another integer `1`, `2`, `3`, etc.
 
 - `(procedure arg₁ arg₂  ...)` applies `procedure` to the arguments `arg₁`, `arg₂`, etc,
 where `procedure` is either the result of a `lambda` expression, or one of the built-in
-functions `car`, `cdr`, `cons`, `pair?`, `+`, `-`, `*`, `=`, `<`, `>`, `display`, `list`,
-`number?`, `symbol?`.
+functions `car`, `cdr`, `cons`, `pair?`, `+`, `-`, `*`, `<`, `>`, `display`, `list`,
+`number?`, `symbol?`, `eq?` and `file`.
+
+# Primitives
+
+- The primitive `(file)` returns a list with the current line number and current file name being parsed.
+
+
+
 
 # Tagged pointers
 
@@ -110,8 +117,8 @@ The interpreter handles _objects_ which can be
 
 These objects are stored in 32-bit integers, but to separate them we use 3 bits as a tag for the 8 
 different kinds of objects. The tag can be stored in the lower 3 bits or in the 3 most significant bits.
-The trade-offs between these are:
-
+The trade-offs between these are described in the next section but I have opted for storing the 
+tag in the lower 3 bits.
 
 ## Store the tag in the most significant bits
 
@@ -124,7 +131,7 @@ tttbbbbb bbbbbbbb bbbbbbbb bbbbbbbb
 - To use the value, we need to mask off the three most significant bits, i.e., `n & 0x1fffffff`.
 
 For pairs, we use the tag `000` so that we can use the tagged value "as-is".  This saves some
-time when manipulating lists with `car`, `cdr` and `cons`.
+time when chasing lists with `car` and `cdr`.
 
 For integers, it gets complicated: a negative integer in 2's complement format must have its
 most significant bits set to 1 again after removing the tag.
@@ -141,6 +148,9 @@ the 28th bit every time we need the integer value.) So the largest number we can
 268435455 which is stored as `11101111 11111111 11111111 11111111`. The smallest number we 
 can store is -268435456 which is stored as `11110000 00000000 00000000 00000000`.
 
+As it turns out, we still have to consider negative numbers if we store the tag in the least
+significan bits.
+
 ## Store the tag in the least significant bits
 
 ```
@@ -155,10 +165,11 @@ For pairs, we would have to shift the value three bits to the right before using
 a small extra cost we need to pay every time we follow the car/cdr of a cons cell and 
 makes traversing a list more time consuming.
 
-For integers, we wouldn't have to keep track of the sign bit for negative numbers but we
-must of course also shift the tagged value three bits to the right before using it.
+For integers, we still have to add the three missing (most significant) bits for negative
+numbers when we get rid of the tag by shifting.
 We _could_ use `000` as the tag for numbers and apply addition, subtraction, etc on the 
-tagged numbers but LISP program typically don't do a lot of number crunching.
+tagged numbers but LISP program typically don't do a lot of number crunching so we
+reserve the tag `000` for pairs instead.
 
 # Future plans
 
