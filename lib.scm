@@ -1,7 +1,25 @@
+;;; (binary-and x y) => x && y
+(define binary-and
+  (lambda (x y)
+    (if x y #f)))
+
+;;; (binary-or x y) => x || y
+(define binary-or
+  (lambda (x y)
+    (if x #t y)))
+
+;;; (equal? x y) ==> #t if x and y are structurally equal, #f otherwise
+(define equal?
+  (lambda (x y)
+    (if (binary-and (pair? x) (pair? y))
+	(binary-and (equal? (car x) (car y))
+		    (equal? (cdr x) (cdr y)))
+	(eq? x y))))
+
 ;;; (assert x y) => #t if x == y, otherwise abort
 (define assert
   (lambda (x y)
-    (if (eq? x y)
+    (if (equal? x y)
 	#t
 	(begin
 	  (display "*** assert failed\n")
@@ -43,16 +61,6 @@
 (define caddr (lambda (l) (car (cdr (cdr l)))))
 (define first (lambda (l) (car l)))
 (define rest  (lambda (l) (cdr l)))
-
-;;; (binary-and x y) => x && y
-(define binary-and
-  (lambda (x y)
-    (if x y #f)))
-
-;;; (binary-or x y) => x || y
-(define binary-or
-  (lambda (x y)
-    (if x #t y)))
 
 ;;; (foldl f (t_1 t_2 ... t_n) base) => f(t_1, f(t_2, (f(..., f(t_n, base)))))
 (define foldl
@@ -133,3 +141,29 @@
 (define newline
   (lambda ()
     (display "\n")))
+
+(define abs
+  (lambda (n)
+    (if (< n 0)
+	(- n)
+	n)))
+
+(assert (equal? 'a 'a) #t)
+(assert (equal? 'a 'b) #f)
+(assert (equal? 3 3) #t)
+(assert (equal? 3 5) #f)
+(assert (equal? '(1 2) '(1 2)) #t)
+(assert (equal? '(1 2) '(2 1)) #f)
+(assert (equal? '(1 2) '(1 (2))) #f)
+(assert (equal? '(1 2) '(1)) #f)
+(assert (equal? '(1) '(1 2)) #f)
+(assert (equal? '(1 (2 3)) '(1 (2 3))) #t)
+(assert (equal? '((1 2) 3) '(1 (2 3))) #f)
+
+(define map
+  (lambda (f l)
+    (if (null? l)
+	'()
+	(cons (f (car l)) (map f (cdr l))))))
+
+(assert (map abs '(-3 1 -4 1 -5 9 -2 6 -5 3 -5)) '(3 1 4 1 5 9 2 6 5 3 5))
