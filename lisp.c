@@ -5,11 +5,11 @@
   * List of things to fix:
   * ======================
   * Dotted pairs can't be read
-  * One token lookahead prevents friendly REPL
+  * One token lookahead prevents friendly REPL, use GNU readline instead
   * Catch C-c to stop interpreter and return to REPL
   * Write garbage collector
   * call/cc
-  *
+  * 
  **/
 
 #include <stdio.h>
@@ -22,6 +22,9 @@
 #include "lisp.h"
 #include "print.h"
 #include "hashtab.h"
+#include "gc.h"
+
+Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, root;
 
 char *continuation_string[] = {
   "PRINT_RESULT", "EV_IF_DECIDE", "EV_IF_CONSEQUENT", "EV_IF_ALTERNATIVE", "EV_ASSIGNMENT_1", "EV_DEFINITION_1",
@@ -36,7 +39,6 @@ char *fname;
 FILE *fp;
 int lineno;
 char *progname;
-
 
 static jmp_buf jmpbuf;
 void error(char *s)   {
@@ -56,9 +58,6 @@ void unbound(Obj id) {
   longjmp(jmpbuf, 1);
 }
 
-Obj NIL = 0;
-Obj free_index = 1;                    // can't start at 0 because 0 means NIL
-
 #define cddr(p) (cdr(cdr(p)))
 #define cdddr(p) (cdr(cdr(cdr(p))))
 #define cadr(p) (car(cdr(p)))
@@ -66,8 +65,10 @@ Obj free_index = 1;                    // can't start at 0 because 0 means NIL
 #define cadddr(p) (car(cdr(cdr(cdr(p)))))
 
 Obj cons(Obj car_, Obj cdr_) {  /* aka mkpair */
-  if (free_index > MEMSIZE)
-      error("Error: memory full!");
+  if (free_index > MEMSIZE) {
+    printf("Memory is full (and garbage collection is not yet implemented)\n");
+    gc();
+  }
   thecars[free_index] = car_;
   thecdrs[free_index] = cdr_;
   return (free_index++ << 3) | PAIR_TAG;
@@ -171,6 +172,10 @@ Obj pop() {
 }
 
 void init_symbols() {
+
+  // the root object is a list of all registers which points into memory
+  root = cons(env, cons(val, cons(unev, cons(argl, cons(proc, cons(expr, NIL))))));
+
   False = mkbool("#f");
   True = mkbool("#t");
 
@@ -746,10 +751,10 @@ int main(int argc, char *argv[]) {
   progname = argv[0];
   int libloaded = 0;
 
-  thecars = (Obj *)malloc(MEMSIZE * sizeof(Obj));
-  thecdrs = (Obj *)malloc(MEMSIZE * sizeof(Obj));  
-  newcars = (Obj *)malloc(MEMSIZE * sizeof(Obj));
-  newcdrs = (Obj *)malloc(MEMSIZE * sizeof(Obj));
+  thecars = (Obj *)calloc(MEMSIZE, sizeof(Obj));
+  thecdrs = (Obj *)calloc(MEMSIZE, sizeof(Obj));  
+  newcars = (Obj *)calloc(MEMSIZE, sizeof(Obj));
+  newcdrs = (Obj *)calloc(MEMSIZE, sizeof(Obj));
   
   init_symbols();
   init_env();

@@ -139,7 +139,7 @@ void dump_memory() {
   printf("env = %d\n", (int) env);
   int i, last;
   for (last = MEMSIZE; last >= 0; last--)
-    if (car(last))
+    if (thecars[last])
       break;
   for (i = 0; i < last; i+= 12)
     dump_memory2(i, i+11);

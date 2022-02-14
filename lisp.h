@@ -19,13 +19,15 @@ typedef uint32_t Obj;
 #define BOOL_TAG   6
 #define ARRAY_TAG  7
 
+// use the PRIM_TAG with the highest number for broken heart
+#define BROKENHEART 0xfffffff4
+
+
 int objtype(Obj n);
 int objval(Obj n);
 
 Obj *thecars, *thecdrs, *newcars, *newcdrs;
-Obj True, False;
-Obj env, val, unev, argl, proc, expr;
-extern Obj NIL;
+extern Obj NIL, free_index, True, False, env, val, unev, argl, proc, expr, root;
 
 extern int verbose;
 

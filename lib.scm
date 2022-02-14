@@ -2,6 +2,9 @@
   (lambda ()
     (display "\n")))
 
+;;; binary-and and binary-or should not evaluate both of its arguments
+;;; but since we don't have macros yet, this will have to suffice.
+
 ;;; (binary-and x y) => x && y
 (define binary-and
   (lambda (x y)
