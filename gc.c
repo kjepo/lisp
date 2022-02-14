@@ -6,7 +6,7 @@
 
 void gc() {
   printf("GARBAGE COLLECTING\n");
-  Obj scan, alloc = 0;		/* indices into newcars/newcdrs */
+  Obj scan, alloc;		/* indices into newcars/newcdrs */
 
   // Update root set with current values for env, val, unev, argl, proc and expr
   car(root) = env;
@@ -20,7 +20,15 @@ void gc() {
   newcars[0] = root;
   newcdrs[0] = NIL;
   alloc = 1;
-  
+  scan = 0;
+  while (alloc > scan) {
+    Obj p1 = newcars[scan];
+    Obj p2 = newcdrs[scan];
+    if (is_pair((p1)))
+	       ;
+    
+    
+  }
     
   return;
 }

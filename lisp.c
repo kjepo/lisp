@@ -14,9 +14,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
-#include <ctype.h>
-#include <string.h>
 #include <setjmp.h>
 #include <readline/readline.h>
 #include "lisp.h"
@@ -29,10 +26,9 @@ Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, root;
 char *continuation_string[] = {
   "PRINT_RESULT", "EV_IF_DECIDE", "EV_IF_CONSEQUENT", "EV_IF_ALTERNATIVE", "EV_ASSIGNMENT_1", "EV_DEFINITION_1",
   "EV_APPL_DID_OPERATOR", "EV_APPL_ACCUMULATE_ARG", "EV_APPL_ACCUM_LAST_ARG", "EV_SEQUENCE_CONTINUE",
-  "EVAL_DISPATCH", "EV_SELF_EVAL", "EV_VARIABLE", "EV_QUOTED", "EV_IF", "EV_ASSIGNMENT", "EV_DEFINITION", 
-  "EV_LAMBDA", "EV_BEGIN", "EV_APPLICATION", "EV_APPL_OPERAND_LOOP", "EV_APPL_LAST_ARG", "EV_SEQUENCE",
-  "EV_SEQUENCE_LAST_EXP", "APPLY_DISPATCH", "PRIMITIVE_APPLY", "COMPOUND_APPLY", "UNKNOWN_PROCEDURE_TYPE",
-  "UNKNOWN_EXPRESSION_TYPE" };
+  "EVAL_DISPATCH", "EV_SELF_EVAL", "EV_VARIABLE", "EV_QUOTED", "EV_IF", "EV_ASSIGNMENT", "EV_DEFINITION", "EV_LAMBDA",
+  "EV_BEGIN", "EV_APPLICATION", "EV_APPL_OPERAND_LOOP", "EV_APPL_LAST_ARG", "EV_SEQUENCE", "EV_SEQUENCE_LAST_EXP",
+  "APPLY_DISPATCH", "PRIMITIVE_APPLY", "COMPOUND_APPLY", "UNKNOWN_PROCEDURE_TYPE", "UNKNOWN_EXPRESSION_TYPE" };
 
 int verbose = 0;
 char *fname;
@@ -57,12 +53,6 @@ void unbound(Obj id) {
   printf("Unbound variable %s\n", find(objval(id)));
   longjmp(jmpbuf, 1);
 }
-
-#define cddr(p) (cdr(cdr(p)))
-#define cdddr(p) (cdr(cdr(cdr(p))))
-#define cadr(p) (car(cdr(p)))
-#define caddr(p) (car(cdr(cdr(p))))
-#define cadddr(p) (car(cdr(cdr(cdr(p)))))
 
 Obj cons(Obj car_, Obj cdr_) {  /* aka mkpair */
   if (free_index > MEMSIZE) {
@@ -172,7 +162,6 @@ Obj pop() {
 }
 
 void init_symbols() {
-
   // the root object is a list of all registers which points into memory
   root = cons(env, cons(val, cons(unev, cons(argl, cons(proc, cons(expr, NIL))))));
 
@@ -660,7 +649,7 @@ Token scan() {
 	return (token = NUM);
       return (token = ID);
     } else
-      printf("lexical error: %c\n", ch);
+      printf("lexical error at line %d in file %s: %c\n", lineno, fname, ch);
     break;
   }
   return token = END;
@@ -689,7 +678,6 @@ Obj parse_atom() {
 }
 
 Obj parse();
-
 Obj parse_seq() {
   if (token != RPAR && token != END)
     return cons(parse(), parse_seq());
@@ -722,11 +710,9 @@ Obj parse() {
 }
 
 void rep() {
-  lineno = 0;
+  lineno = 1;
   scan();
   while ((expr = parse())) {
-    //    printf("Evaluates to: "); 
-    //    display(expr); NL;
     env = prim_proc;
     eval();
     if (fp == stdin)

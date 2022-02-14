@@ -174,4 +174,3 @@
         (cons (f (car l)) (map f (cdr l))))))
 
 (assert (map abs '(-3 1 -4)) '(3 1 4))
-

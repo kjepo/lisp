@@ -22,9 +22,9 @@ typedef uint32_t Obj;
 // use the PRIM_TAG with the highest number for broken heart
 #define BROKENHEART 0xfffffff4
 
-
-int objtype(Obj n);
-int objval(Obj n);
+int objtype(Obj);
+int objval(Obj);
+int is_pair(Obj);
 
 Obj *thecars, *thecdrs, *newcars, *newcdrs;
 extern Obj NIL, free_index, True, False, env, val, unev, argl, proc, expr, root;
