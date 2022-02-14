@@ -17,6 +17,7 @@
 (assert (symbol? 'a) #t)
 (assert (symbol? '(1 2 3)) #f)
 (assert (plus (times 3 (plus (times 2 4) (plus 3 5))) (plus (minus 10 7) 6)) 57)
+(assert (minus 0 1) -1)
  
 ;;; (list 1 2 3) => (1 2 3)
 (define list (lambda l l))
@@ -40,6 +41,8 @@
 (define cddr  (lambda (l) (cdr (cdr l))))
 (define cdddr (lambda (l) (cdr (cdr (cdr l)))))
 (define caddr (lambda (l) (car (cdr (cdr l)))))
+(define first (lambda (l) (car l)))
+(define rest  (lambda (l) (cdr l)))
 
 ;;; (binary-and x y) => x && y
 (define binary-and

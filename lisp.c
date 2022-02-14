@@ -2,12 +2,11 @@
   * Simple explicit-control register-machine Scheme-like interpreter
   * Written in 2022 by Kjell Post (but a dormant project since 1986)
   *
-  * List of things to implement:
-  *
+  * List of things to fix:
+  * ======================
   * Dotted pairs can't be read
   * One token lookahead prevents friendly REPL
   * Catch C-c to stop interpreter and return to REPL
-  * Replace magic numbers in objval and mknum in terms of NUM_TAG
   * Write garbage collector
   * call/cc
   *
@@ -21,7 +20,16 @@
 #include <setjmp.h>
 #include <readline/readline.h>
 #include "lisp.h"
+#include "print.h"
 #include "hashtab.h"
+
+char *continuation_string[] = {
+  "PRINT_RESULT", "EV_IF_DECIDE", "EV_IF_CONSEQUENT", "EV_IF_ALTERNATIVE", "EV_ASSIGNMENT_1", "EV_DEFINITION_1",
+  "EV_APPL_DID_OPERATOR", "EV_APPL_ACCUMULATE_ARG", "EV_APPL_ACCUM_LAST_ARG", "EV_SEQUENCE_CONTINUE",
+  "EVAL_DISPATCH", "EV_SELF_EVAL", "EV_VARIABLE", "EV_QUOTED", "EV_IF", "EV_ASSIGNMENT", "EV_DEFINITION", 
+  "EV_LAMBDA", "EV_BEGIN", "EV_APPLICATION", "EV_APPL_OPERAND_LOOP", "EV_APPL_LAST_ARG", "EV_SEQUENCE",
+  "EV_SEQUENCE_LAST_EXP", "APPLY_DISPATCH", "PRIMITIVE_APPLY", "COMPOUND_APPLY", "UNKNOWN_PROCEDURE_TYPE",
+  "UNKNOWN_EXPRESSION_TYPE" };
 
 int verbose = 0;
 FILE *fp;
@@ -33,44 +41,11 @@ void error(char *s)   {
   longjmp(jmpbuf, 1);
 }
 
-void display(Obj);
-void display2(Obj, int);
-
-
-// Objects are tagged with 3 most significant bits xxx
-// xxx11111 11111111 11111111 11111111
-// number      000bbbbbb ... bbbbbbbb
-// symbol      001bbbbbb ... bbbbbbbb
-// pair        010bbbbbb ... bbbbbbbb
-// procedure   011bbbbbb ... bbbbbbbb
-// primitive   100bbbbbb ... bbbbbbbb
-// string      101
-// boolean     110bbbbbb ... bbbbbbbb
-// array       111
-
-// some of these numbers should not be changed, in particular PAIR_TAG and NUM_TAG
-#define PAIR_TAG   0
-#define SYMBOL_TAG 1
-#define NUM_TAG    2
-#define PROC_TAG   3
-#define PRIM_TAG   4
-#define STR_TAG    5
-#define BOOL_TAG   6
-#define ARRAY_TAG  7
-
-int objtype(Obj n) {
-  return (n >> 29) & 0x7;
-}
-
-void printBits(size_t const size, void const * const ptr);
-
-int objval(Obj n) {
-  int c = n & 0x1fffffff;  
-  if (objtype(n) == NUM_TAG)
-    if (n & 0x10000000) {       /* a negative number (2's complement) */
-      return c | 0xe0000000;
-    }
-  return c;
+int objtype(Obj n) { return n & 7; }
+int objval(Obj n)  {
+  if (objtype(n) == NUM_TAG && (n & 0x80000000)) /* handle negative number */
+      return ((n >> 3) | 0xe0000000); 
+  return n >> 3;
 }
 
 void unbound(Obj id) {
@@ -78,14 +53,9 @@ void unbound(Obj id) {
   longjmp(jmpbuf, 1);
 }
 
-#define MEMSIZE 16384
-
-Obj *thecars, *thecdrs, *newcars, *newcdrs;
-Obj free_index = 1;                    // can't start at 0 because 0 means NIL
 Obj NIL = 0;
+Obj free_index = 1;                    // can't start at 0 because 0 means NIL
 
-#define car(p) (thecars[p])
-#define cdr(p) (thecdrs[p])
 #define cddr(p) (cdr(cdr(p)))
 #define cdddr(p) (cdr(cdr(cdr(p))))
 #define cadr(p) (car(cdr(p)))
@@ -95,23 +65,23 @@ Obj NIL = 0;
 Obj cons(Obj car_, Obj cdr_) {  /* aka mkpair */
   if (free_index > MEMSIZE)
       error("Error: memory full!");
-  car(free_index) = car_;
-  cdr(free_index) = cdr_;
-  return free_index++ | (PAIR_TAG << 29);
+  thecars[free_index] = car_;
+  thecdrs[free_index] = cdr_;
+  return (free_index++ << 3) | PAIR_TAG;
 }
 
 typedef enum {
   PRIM_CAR,  PRIM_CDR,  PRIM_CONS,  PRIM_PAIRP,  PRIM_PLUS,  PRIM_MINUS,  PRIM_TIMES,  PRIM_EQ, PRIM_EQP,
   PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP, PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT } Primitive;
 
-Obj mknum(int n) { return (n & 0x1fffffff) | (NUM_TAG << 29); }
-Obj mkstr(char *str) { return lookup(str) | (STR_TAG << 29); }
-Obj mksym(char *id) { return lookup(id) | (SYMBOL_TAG << 29); }
-Obj mkbool(char *id) { return lookup(id) | (BOOL_TAG << 29); }
-Obj mkprim(Primitive p) { return p | (PRIM_TAG << 29); }
+Obj mknum(int n) { return (n << 3) | NUM_TAG; }
+Obj mkstr(char *str) { return ((lookup(str)) << 3) | STR_TAG; }
+Obj mksym(char *id) { return ((lookup(id)) << 3) | SYMBOL_TAG; }
+Obj mkbool(char *id) { return ((lookup(id)) << 3) | BOOL_TAG; }
+Obj mkprim(Primitive p) { return (p << 3) | PRIM_TAG; }
 Obj mkproc(Obj parameters, Obj body, Obj env) { // a procedure is a triple (parameters body env) */
   Obj p = cons(parameters, cons(body, cons(env, NIL)));
-  return objval(p) | (PROC_TAG << 29);
+  return ((objval(p)) << 3) | PROC_TAG;
 }
 
 Obj append(Obj l, Obj m) { return (l == NIL ? m : cons(car(l), append(cdr(l), m))); }
@@ -121,25 +91,7 @@ Obj TRUE_SYM, IF_SYM, EQ_SYM, LET_SYM, ADD_SYM, SUB_SYM,
   MUL_SYM, DIV_SYM, DEFINE_SYM, CAR_SYM, CDR_SYM, CONS_SYM, ATOM_SYM,
   QUOTE_SYM, LETREC_SYM, LAMBDA_SYM, SETBANG_SYM, BEGIN_SYM;
 
-typedef enum {  PRINT_RESULT, EV_IF_DECIDE, EV_IF_CONSEQUENT, EV_IF_ALTERNATIVE, EV_ASSIGNMENT_1,              
-  EV_DEFINITION_1, EV_APPL_DID_OPERATOR, EV_APPL_ACCUMULATE_ARG, EV_APPL_ACCUM_LAST_ARG, EV_SEQUENCE_CONTINUE,
-  EVAL_DISPATCH, EV_SELF_EVAL, EV_VARIABLE, EV_QUOTED, EV_IF, EV_ASSIGNMENT, EV_DEFINITION, EV_LAMBDA, EV_BEGIN,
-  EV_APPLICATION, EV_APPL_OPERAND_LOOP, EV_APPL_LAST_ARG, EV_SEQUENCE, EV_SEQUENCE_LAST_EXP, APPLY_DISPATCH,
-  PRIMITIVE_APPLY, COMPOUND_APPLY, UNKNOWN_PROCEDURE_TYPE, UNKNOWN_EXPRESSION_TYPE } Continuation;
-
-char *continuation_string[] = {
-  "PRINT_RESULT", "EV_IF_DECIDE", "EV_IF_CONSEQUENT", "EV_IF_ALTERNATIVE", "EV_ASSIGNMENT_1", "EV_DEFINITION_1",
-  "EV_APPL_DID_OPERATOR", "EV_APPL_ACCUMULATE_ARG", "EV_APPL_ACCUM_LAST_ARG", "EV_SEQUENCE_CONTINUE",
-  "EVAL_DISPATCH", "EV_SELF_EVAL", "EV_VARIABLE", "EV_QUOTED", "EV_IF", "EV_ASSIGNMENT", "EV_DEFINITION", 
-  "EV_LAMBDA", "EV_BEGIN", "EV_APPLICATION", "EV_APPL_OPERAND_LOOP", "EV_APPL_LAST_ARG", "EV_SEQUENCE",
-  "EV_SEQUENCE_LAST_EXP", "APPLY_DISPATCH", "PRIMITIVE_APPLY", "COMPOUND_APPLY", "UNKNOWN_PROCEDURE_TYPE",
-  "UNKNOWN_EXPRESSION_TYPE" };
-
-Continuation cont, label;
-Obj Stack[100];
-int StackPtr;
-Obj env, val, unev, argl, proc, expr;
-Obj True, False;
+Continuation label;
 
 Obj pairup(Obj vars, Obj vals) {
   if (vars == NIL)
@@ -303,32 +255,30 @@ int ensure_numerical(Obj p, char *opname) {
   printf(" passed as an argument of %s, is not of the correct type.\n", opname);
   longjmp(jmpbuf, 1);
 }
-void prim_plus()  { val = mknum(ensure_numerical(car(argl), "+") + ensure_numerical(cadr(argl), "+")); }
-void prim_minus()  { val = mknum(ensure_numerical(car(argl), "-") - ensure_numerical(cadr(argl), "-")); }
-void prim_times()  { val = mknum(ensure_numerical(car(argl), "*") * ensure_numerical(cadr(argl), "*")); }
-void prim_eq()  { val = ensure_numerical(car(argl), "=") == ensure_numerical(cadr(argl), "=") ? True : False; }
-void prim_lt()  { val = ensure_numerical(car(argl), "<") < ensure_numerical(cadr(argl), "<") ? True : False; }
-void prim_gt()  { val = ensure_numerical(car(argl), ">") > ensure_numerical(cadr(argl), ">") ? True : False; }
 
-/* argl is a list of arguments (a1 a2 a3 .. aN) */
-/* if the primitive function only takes one argument, it is a1 */
-/* if the primitive function takes two arguments, they are a1 and a2 */
-void prim_eqp()   { val = car(argl) == cadr(argl) ? True : False; }
-void prim_car()   { verify_list(argl, "car"); val = car(car(argl)); }
-void prim_cdr()   { verify_list(argl, "cdr"); val = cdr(car(argl)); }
-void prim_cons()  { val = cons(car(argl), cadr(argl)); }
-void prim_pairp() { val = is_pair(car(argl)) ? True : False; }
-void prim_nullp() { val = (car(argl) == NIL ? True : False); }
+// argl is a list of arguments (a1 a2 a3 .. aN)
+// if the primitive function only takes one argument, it is a1
+// if the primitive function takes two arguments, they are a1 and a2
+void prim_plus()    { val = mknum(ensure_numerical(car(argl), "+") + ensure_numerical(cadr(argl), "+")); }
+void prim_minus()   { val = mknum(ensure_numerical(car(argl), "-") - ensure_numerical(cadr(argl), "-")); }
+void prim_times()   { val = mknum(ensure_numerical(car(argl), "*") * ensure_numerical(cadr(argl), "*")); }
+void prim_eq()      { val = ensure_numerical(car(argl), "=") == ensure_numerical(cadr(argl), "=") ? True : False; }
+void prim_lt()      { val = ensure_numerical(car(argl), "<") < ensure_numerical(cadr(argl), "<") ? True : False; }
+void prim_gt()      { val = ensure_numerical(car(argl), ">") > ensure_numerical(cadr(argl), ">") ? True : False; }
+void prim_eqp()     { val = car(argl) == cadr(argl) ? True : False; }
+void prim_car()     { verify_list(argl, "car"); val = car(car(argl)); }
+void prim_cdr()     { verify_list(argl, "cdr"); val = cdr(car(argl)); }
+void prim_cons()    { val = cons(car(argl), cadr(argl)); }
+void prim_pairp()   { val = is_pair(car(argl)) ? True : False; }
+void prim_nullp()   { val = (car(argl) == NIL ? True : False); }
 void prim_display() { display(car(argl)); }
 void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
 void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
-void prim_exit()  { longjmp(jmpbuf, 1); } /* fixme: maybe call this quit() and let exit do exit(0) ? */
+void prim_exit()    { longjmp(jmpbuf, 1); } /* fixme: maybe call this quit() and let exit do exit(0) ? */
 
 void (*primitives[])() = {
   prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq, prim_eqp,
   prim_lt, prim_gt, prim_display, prim_numberp, prim_symbolp, prim_nullp, prim_exit };
-
-#include "debug.h"
 
 void eval_dispatch() {
   label = EVAL_DISPATCH;
@@ -389,10 +339,10 @@ void eval_dispatch() {
 
     case COMPOUND_APPLY:
       display_registers("COMPOUND_APPLY");
-      unev = car(objval(proc));      /* procedure parameters */
-      env = caddr(objval(proc));     /* procedure environment */
+      unev = car(proc);      /* procedure parameters */
+      env = caddr(proc);     /* procedure environment */
       env = bind(unev, argl, env);   /* bind formals to arguments */
-      unev = cadr(objval(proc));     /* procedure body */
+      unev = cadr(proc);     /* procedure body */
       label = EV_SEQUENCE;
       continue;
 
@@ -759,6 +709,8 @@ Obj parse() {
 void rep() {
   scan();
   while ((expr = parse())) {
+    //    printf("Evaluates to: "); 
+    //    display(expr); NL;
     env = prim_proc;
     eval();
     if (fp == stdin)
@@ -777,8 +729,6 @@ void slurp(char *fname) {
   }
 }
 
-void printBits(size_t const size, void const * const ptr);
-
 int main(int argc, char *argv[]) {
   char *usage = "usage: %s [-h] [-v] [filename ...]\n";
   progname = argv[0];
@@ -788,14 +738,7 @@ int main(int argc, char *argv[]) {
   thecdrs = (Obj *)malloc(MEMSIZE * sizeof(Obj));  
   newcars = (Obj *)malloc(MEMSIZE * sizeof(Obj));
   newcdrs = (Obj *)malloc(MEMSIZE * sizeof(Obj));
-
-
-  Obj p = mknum(268435455);
-  printBits(4, &p);
-  NL;
-  printf("%d\n", objval(p));
-
-
+  
   init_symbols();
   init_env();
   fp = stdin;
