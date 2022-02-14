@@ -10,9 +10,6 @@
   * Write garbage collector
   * call/cc
   *
-  * (car line) works, where is the error check?
-  * when reporting "missing )", also show line number and file name
-  *
  **/
 
 #include <stdio.h>
@@ -43,7 +40,7 @@ char *progname;
 
 static jmp_buf jmpbuf;
 void error(char *s)   {
-  printf("%s\n", s);
+  printf("%s on line %d, file %s\n", s, lineno, fname);
   longjmp(jmpbuf, 1);
 }
 
@@ -248,10 +245,11 @@ int is_begin()           { return is_pair(expr) && BEGIN_SYM == car(expr); }
 int is_application()     { return is_pair(expr); }
 
 void verify_list(Obj p, char *fcnname) {
-  if (is_pair(p) && is_pair(car(p)))
+  if (is_pair(p))
     return;
-  printf("The object "); display(car(p));
+  printf("The object "); display(p);
   printf(" passed as the first argument of %s, is not of the correct type.\n", fcnname);
+  printf("(Line %d, file %s)\n", lineno, fname);
   longjmp(jmpbuf, 1);
 }
 
@@ -273,8 +271,8 @@ void prim_eq()      { val = ensure_numerical(car(argl), "=") == ensure_numerical
 void prim_lt()      { val = ensure_numerical(car(argl), "<") < ensure_numerical(cadr(argl), "<") ? True : False; }
 void prim_gt()      { val = ensure_numerical(car(argl), ">") > ensure_numerical(cadr(argl), ">") ? True : False; }
 void prim_eqp()     { val = car(argl) == cadr(argl) ? True : False; }
-void prim_car()     { verify_list(argl, "car"); val = car(car(argl)); }
-void prim_cdr()     { verify_list(argl, "cdr"); val = cdr(car(argl)); }
+void prim_car()     { verify_list(car(argl), "car"); val = car(car(argl)); }
+void prim_cdr()     { verify_list(car(argl), "cdr"); val = cdr(car(argl)); }
 void prim_cons()    { val = cons(car(argl), cadr(argl)); }
 void prim_pairp()   { val = is_pair(car(argl)) ? True : False; }
 void prim_nullp()   { val = (car(argl) == NIL ? True : False); }
