@@ -9,6 +9,7 @@
   * Catch C-c to stop interpreter and return to REPL
   * Write garbage collector
   * call/cc
+  * Rewrite makefile
   * 
  **/
 
@@ -55,9 +56,9 @@ void unbound(Obj id) {
 }
 
 Obj cons(Obj car_, Obj cdr_) {  /* aka mkpair */
-  if (free_index > MEMSIZE) {
+  if (free_index >= MEMSIZE/2) {
     printf("Memory is full (and garbage collection is not yet implemented)\n");
-    gc();
+    // gc();
   }
   thecars[free_index] = car_;
   thecdrs[free_index] = cdr_;
@@ -159,6 +160,16 @@ Obj pop() {
   if (StackPtr <= 0)
     error("Stack underflow!");
   return Stack[--StackPtr];
+}
+
+// Update root set with current values for env, val, unev, argl, proc and expr
+void update_rootset() {
+  car(root) = env;
+  car(cdr(root)) = val;
+  car(cdr(cdr(root))) = unev;
+  car(cdr(cdr(cdr(root)))) = argl;
+  car(cdr(cdr(cdr(cdr(root))))) = proc;
+  car(cdr(cdr(cdr(cdr(cdr(root)))))) = expr;
 }
 
 void init_symbols() {
@@ -737,13 +748,16 @@ int main(int argc, char *argv[]) {
   progname = argv[0];
   int libloaded = 0;
 
+  // printf("Welcome to Lisp, word size is %d\n", sizeof(Obj));
+
   thecars = (Obj *)calloc(MEMSIZE, sizeof(Obj));
   thecdrs = (Obj *)calloc(MEMSIZE, sizeof(Obj));  
-  newcars = (Obj *)calloc(MEMSIZE, sizeof(Obj));
-  newcdrs = (Obj *)calloc(MEMSIZE, sizeof(Obj));
   
   init_symbols();
-  init_env();
+  init_env(); 
+  //prim_proc = cons(NIL, NIL);  // can't be NIL (make space for 1 binding)  
+  //  add_binding(mksym("cons"), mkprim(PRIM_CONS), prim_proc);
+  
   fp = stdin;
   fname = "stdin";
 
@@ -791,6 +805,7 @@ int main(int argc, char *argv[]) {
   printf("===> ");
   rep();
 
+  //  gc();
   if (verbose) {
     dump_memory();
     printf("env: "); display(env); NL;

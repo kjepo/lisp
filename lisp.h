@@ -2,7 +2,7 @@
 #define LISPH
 
 #define NL printf("\n");
-#define MEMSIZE 16384
+#define MEMSIZE 32768
 #define STACKSIZE 100
 
 // Objects are tagged 32-bit values
@@ -22,9 +22,11 @@ typedef uint32_t Obj;
 // use the PRIM_TAG with the highest number for broken heart
 #define BROKENHEART 0xfffffff4
 
-int objtype(Obj);
-int objval(Obj);
-int is_pair(Obj);
+extern int objtype(Obj);
+extern int objval(Obj);
+extern int is_pair(Obj);
+extern int is_compound(Obj);
+extern void update_rootset();
 
 Obj *thecars, *thecdrs, *newcars, *newcdrs;
 extern Obj NIL, free_index, True, False, env, val, unev, argl, proc, expr, root;

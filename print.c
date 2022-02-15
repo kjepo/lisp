@@ -75,6 +75,7 @@ void display_registers(char *where) {
   if (!verbose)
     return;
   printf("===============================%s=\n", where);
+    
   printf("expr: "); display(expr); NL;
   printf("env:  "); display(env); NL;
   printf("cont: "); printf("%s\n", continuation_string[cont]);
@@ -109,6 +110,9 @@ void dumpval(Obj n) {
   case PROC_TAG:
     printf("$%d ", objval(n));
     break;
+  case PRIM_TAG:
+    printf("prim%d ", objval(n));
+    break;
   default:
     printf("?%d ", objval(n));
     break;
@@ -135,7 +139,90 @@ void dump_memory2(int from, int to) {
   printf("\n");
 }
 
+char *cellname(Obj p) {
+  char *name = malloc(80);
+  if (p == 0)
+    return "-";
+  switch (objtype(p)) {
+  case PAIR_TAG:
+    sprintf(name, "P%d", objval(p));
+    return name;
+  case SYMBOL_TAG:
+    sprintf(name, "%s", find(objval(p)));
+    if (name[0] == '<')
+      return "\\<";
+    else if (name[0] == '>')
+      return "\\>";
+    return name;
+  case BOOL_TAG:
+    sprintf(name, "%s", objval(p) == False ? "#f" : "#t");
+    return name;
+  case STR_TAG:
+    sprintf(name, "\"%s\"", find(objval(p)));
+    return name;
+  case NUM_TAG:
+    sprintf(name, "int %d", objval(p));
+    return name;
+  case PROC_TAG:
+    sprintf(name, "proc %d", objval(p));
+    return name;
+  case PRIM_TAG:
+    sprintf(name, "prim %d ", objval(p));
+    return name;
+  default:
+    return "?";
+  }
+}
+
+void mkgraph() {
+  int i;
+  FILE *fp = fopen("mem.dot", "w");
+
+  update_rootset();
+
+  fprintf(fp, "digraph T {\n");
+  fprintf(fp, "page=\"8,11!\";\n");
+  fprintf(fp, "ratio=compress;\n");
+  fprintf(fp, "margin=0;\n");
+  // fprintf(fp, "ranksep=1\n");
+  fprintf(fp, "rankdir=LR\n");
+  // fprintf(fp, "node [fontsize=6, shape=record]\n\n");
+  fprintf(fp, "node [shape=record]\n\n");  
+
+  for (i = 0; i < free_index; i++)
+    fprintf(fp, "%d [label=\"<car>%s | <cdr>%s\"]\n", i, cellname(thecars[i]), cellname(thecdrs[i]));
+
+  fprintf(fp, "root [style=filled, color=\"blue\", fontcolor=\"white\"];\n");
+  fprintf(fp, "env  [style=filled, color=\"cyan\"];\n");
+  fprintf(fp, "val  [style=filled, color=\"cyan\"];\n");
+  fprintf(fp, "unev [style=filled, color=\"cyan\"];\n");
+  fprintf(fp, "argl [style=filled, color=\"cyan\"];\n");
+  fprintf(fp, "proc [style=filled, color=\"cyan\"];\n");
+  fprintf(fp, "expr [style=filled, color=\"cyan\"];\n");
+
+  fprintf(fp, "\n");
+  for (i = 0; i < free_index; i++) {
+    if (is_pair(thecars[i]) || is_compound(thecars[i]))
+      fprintf(fp, "%d:car -> %d:car\n", i, objval(thecars[i]));
+    if (is_pair(thecdrs[i]) || is_compound(thecdrs[i]))
+      fprintf(fp, "%d:cdr -> %d:car\n", i, objval(thecdrs[i]));
+  }
+
+  fprintf(fp, "root -> %d:car\n", objval(root));
+  fprintf(fp, "env -> %d:car\n", objval(env));
+  fprintf(fp, "val -> %d:car\n", objval(val));
+  fprintf(fp, "unev -> %d:car\n", objval(unev));
+  fprintf(fp, "argl -> %d:car\n", objval(argl));
+  fprintf(fp, "proc -> %d:car\n", objval(proc));
+  fprintf(fp, "expr -> %d:car\n", objval(expr));
+
+
+  fprintf(fp, "}\n");
+}
+
+
 void dump_memory() {
+  mkgraph();
   printf("env = %d\n", (int) env);
   int i, last;
   for (last = MEMSIZE; last >= 0; last--)

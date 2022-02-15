@@ -4,23 +4,31 @@
 #include "lisp.h"
 #include "gc.h"
 
+//  thecars                         newcars                         MEMSIZE
+//  |                               |                               |
+//  v                               v                               V
+//  +-------------------------------+-------------------------------+
+//  +                               |                               |
+//  +-------------------------------+-------------------------------+
+
 void gc() {
-  printf("GARBAGE COLLECTING\n");
+
+  Obj *newcars = thecars + MEMSIZE/2;
+  Obj *newcdrs = thecdrs + MEMSIZE/2;
   Obj scan, alloc;		/* indices into newcars/newcdrs */
 
-  // Update root set with current values for env, val, unev, argl, proc and expr
-  car(root) = env;
-  car(cdr(root)) = val;
-  car(cdr(cdr(root))) = unev;
-  car(cdr(cdr(cdr(root)))) = argl;
-  car(cdr(cdr(cdr(cdr(root))))) = proc;
-  car(cdr(cdr(cdr(cdr(cdr(root)))))) = expr;
-  
-  // create cons(root, NIL) in newcars/newcdrs
-  newcars[0] = root;
-  newcdrs[0] = NIL;
-  alloc = 1;
-  scan = 0;
+  printf("GARBAGE COLLECTING\n");
+
+  update_rootset();
+  scan = alloc = 0;
+  printf("gc: root = %d\n", objval(root));
+
+ // create cons(root, NIL) in newcars/newcdrs
+  newcars[alloc] = root;
+  newcdrs[alloc] = NIL;
+  alloc++;
+
+  return;
   while (alloc > scan) {
     Obj p1 = newcars[scan];
     Obj p2 = newcdrs[scan];
