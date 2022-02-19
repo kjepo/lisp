@@ -8,12 +8,19 @@
 #include "print.h"
 
 void display2(Obj expr, int dotted) {
+  if (expr == BROKENHEART) {
+    printf("XXX");
+    return;
+  }
   switch (objtype(expr)) {
   case PAIR_TAG:
     if (expr == NIL)
       printf("()");
     else {
-      if (!dotted)
+      if (car(expr) == PROCEDURE_SYM) { 
+	printf("<λ"); display(cadr(expr)); printf("."); display(caddr(expr)); printf(">");
+	break;
+      } if (!dotted)
 	printf("(");
       display(car(expr));
       if (cdr(expr) != NIL) {
@@ -33,7 +40,7 @@ void display2(Obj expr, int dotted) {
   case NUM_TAG:
     printf("%d", objval(expr));
     break;
-  case PROC_TAG:
+  case BROKEN_TAG:
     if (expr && car(expr)) {
       printf("λ");
       display(car(expr));
@@ -78,22 +85,27 @@ void display_registers(char *where) {
     
   printf("expr: "); display(expr); NL;
   printf("env:  "); display(env); NL;
-  printf("cont: "); printf("%s\n", continuation_string[cont]);
+  printf("cont: "); printf("%s\n", continuation_string[objval(cont)]);
   printf("val:  "); display(val); NL;
   printf("unev: "); display(unev); NL;
   printf("argl: "); display(argl); NL;
   printf("proc: "); display(proc); NL;
-  printf("stack ");
+  //  printf("stack "); display(stack); NL;
+  /*
   for (int i = 0; i < StackPtr; i++) {
     printf("[");
     display(Stack[i]);
     printf("] ");
   }
-  NL;
+  NL; */
   printf("========================================\n");
 }
 
 void dumpval(Obj n) {
+  if (n == BROKENHEART) {
+    printf("XXX ");
+    return;
+  }
   switch (objtype(n)) {
   case PAIR_TAG:
     if (objval(n))
@@ -105,9 +117,9 @@ void dumpval(Obj n) {
     printf("INT %d ", objval(n));
     break;
   case SYMBOL_TAG:
-    printf("A%d ", objval(n));
+    printf("%s ", find(objval(n)));
     break;
-  case PROC_TAG:
+  case BROKEN_TAG:
     printf("$%d ", objval(n));
     break;
   case PRIM_TAG:
@@ -119,21 +131,21 @@ void dumpval(Obj n) {
   }
 }
 
-void dump_memory2(int from, int to) {
+void dump_memory2(int from, int to, Obj *cars, Obj *cdrs, char *carstr, char *cdrstr) {
   int i; 
   printf("      ");
   for (i = from; i <= to; i++) {
     printf("%d:\t", i);
   }
   printf("\n");
-  printf("carS: ");
+  printf("%s: ", carstr);
   for (i = from; i <= to; i++) {
-    dumpval(thecars[i]);
+    dumpval(cars[i]);
     printf("\t");
   }
-  printf("\ncdrS: ");
+  printf("\n%s: ", cdrstr);
   for (i = from; i <= to; i++) {
-    dumpval(thecdrs[i]);
+    dumpval(cdrs[i]);
     printf("\t");
   }
   printf("\n");
@@ -163,7 +175,7 @@ char *cellname(Obj p) {
   case NUM_TAG:
     sprintf(name, "int %d", objval(p));
     return name;
-  case PROC_TAG:
+  case BROKEN_TAG:
     sprintf(name, "proc %d", objval(p));
     return name;
   case PRIM_TAG:
@@ -174,9 +186,13 @@ char *cellname(Obj p) {
   }
 }
 
+int gnr = 0;
+
 void mkgraph() {
   int i;
-  FILE *fp = fopen("mem.dot", "w");
+  char gname[80];
+  sprintf(gname, "mem-%d.dot", gnr++);
+  FILE *fp = fopen(gname, "w");
 
   update_rootset();
 
@@ -199,6 +215,10 @@ void mkgraph() {
   fprintf(fp, "argl [style=filled, color=\"cyan\"];\n");
   fprintf(fp, "proc [style=filled, color=\"cyan\"];\n");
   fprintf(fp, "expr [style=filled, color=\"cyan\"];\n");
+  fprintf(fp, "prim_proc [style=filled, color=\"cyan\"];\n");
+  fprintf(fp, "stack [style=filled, color=\"cyan\"];\n");
+  fprintf(fp, "conscell [style=filled, color=\"cyan\"];\n");
+  fprintf(fp, "cont [style=filled, color=\"cyan\"];\n");
 
   fprintf(fp, "\n");
   for (i = 0; i < free_index; i++) {
@@ -215,21 +235,37 @@ void mkgraph() {
   fprintf(fp, "argl -> %d:car\n", objval(argl));
   fprintf(fp, "proc -> %d:car\n", objval(proc));
   fprintf(fp, "expr -> %d:car\n", objval(expr));
-
+  fprintf(fp, "prim_proc -> %d:car\n", objval(prim_proc));
+  fprintf(fp, "stack -> %d:car\n", objval(stack));
+  fprintf(fp, "conscell -> %d:car\n", objval(conscell));
+  fprintf(fp, "cont -> %d:car\n", objval(cont));
 
   fprintf(fp, "}\n");
+  fclose(fp);
 }
 
+int min(int x, int y) { return x < y ? x : y; }
 
 void dump_memory() {
   mkgraph();
-  printf("env = %d\n", (int) env);
+  printf("MEMORY==> root = %d, env = %d, prim_proc = %d free_index = %d\n",
+	 objval(root), objval(env), objval(prim_proc), free_index);
   int i, last;
   for (last = MEMSIZE; last >= 0; last--)
     if (thecars[last])
       break;
-  for (i = 0; i < last; i+= 12)
-    dump_memory2(i, i+11);
+  for (i = 0; i < last+11; i+= 12) {
+    if (i < MEMSIZE) {
+      dump_memory2(i, min(i+11, MEMSIZE-1), thecars, thecdrs, "tcar", "tcdr");
+      NL;
+    }
+  }
+  for (i = 0; i < last+11; i+= 12) {
+    if (i < MEMSIZE) {
+      dump_memory2(i, min(i+11, MEMSIZE-1), newcars, newcdrs, "ncar", "ncdr");
+      NL;
+    }
+  }
 }
 
 // Assumes little endian

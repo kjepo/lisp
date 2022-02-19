@@ -2,7 +2,8 @@
 #define LISPH
 
 #define NL printf("\n");
-#define MEMSIZE 32768
+//#define MEMSIZE 128
+#define MEMSIZE 16384
 #define STACKSIZE 100
 
 // Objects are tagged 32-bit values
@@ -13,7 +14,7 @@ typedef uint32_t Obj;
 #define PAIR_TAG   0
 #define SYMBOL_TAG 1
 #define NUM_TAG    2
-#define PROC_TAG   3
+#define BROKEN_TAG 3
 #define PRIM_TAG   4
 #define STR_TAG    5
 #define BOOL_TAG   6
@@ -26,10 +27,12 @@ extern int objtype(Obj);
 extern int objval(Obj);
 extern int is_pair(Obj);
 extern int is_compound(Obj);
+extern Obj mkpair(int);
 extern void update_rootset();
+extern void restore_rootset();
 
 Obj *thecars, *thecdrs, *newcars, *newcdrs;
-extern Obj NIL, free_index, True, False, env, val, unev, argl, proc, expr, root;
+extern Obj NIL, free_index, True, False, env, val, unev, argl, proc, expr, root, prim_proc, stack, conscell;
 
 extern int verbose;
 
@@ -47,11 +50,13 @@ typedef enum {  PRINT_RESULT, EV_IF_DECIDE, EV_IF_CONSEQUENT, EV_IF_ALTERNATIVE,
   EV_APPLICATION, EV_APPL_OPERAND_LOOP, EV_APPL_LAST_ARG, EV_SEQUENCE, EV_SEQUENCE_LAST_EXP, APPLY_DISPATCH,
   PRIMITIVE_APPLY, COMPOUND_APPLY, UNKNOWN_PROCEDURE_TYPE, UNKNOWN_EXPRESSION_TYPE } Continuation;
 
-Continuation cont;
+extern Continuation cont;
 
 extern char *continuation_string[];
 
-Obj Stack[STACKSIZE];
-int StackPtr;
+Obj TRUE_SYM, IF_SYM, EQ_SYM, LET_SYM, ADD_SYM, SUB_SYM, MUL_SYM, DIV_SYM, DEFINE_SYM, CAR_SYM, CDR_SYM,
+  CONS_SYM, ATOM_SYM, QUOTE_SYM, LETREC_SYM, LAMBDA_SYM, SETBANG_SYM, BEGIN_SYM, PROCEDURE_SYM;
 
+//Obj Stack[STACKSIZE];
+//int StackPtr;
 #endif
