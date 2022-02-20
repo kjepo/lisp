@@ -179,7 +179,7 @@ Obj appendx(Obj l, Obj m) {
 }
 
 Obj adjoin_arg(Obj arg, Obj arglist) {
-  return append(arglist, cons(arg, NIL));
+  //  return append(arglist, cons(arg, NIL));
   tmp1 = cons(arg, NIL);	/* should be able to simplify */
   return append(arglist, tmp1);
 }
