@@ -2,8 +2,8 @@
 #define LISPH
 
 #define NL printf("\n");
-//#define MEMSIZE 128
-#define MEMSIZE 16384
+#define MEMSIZE 8192
+//#define MEMSIZE 105
 #define STACKSIZE 100
 
 // Objects are tagged 32-bit values
@@ -32,7 +32,7 @@ extern void update_rootset();
 extern void restore_rootset();
 
 Obj *thecars, *thecdrs, *newcars, *newcdrs;
-extern Obj NIL, free_index, True, False, env, val, unev, argl, proc, expr, root, prim_proc, stack, conscell;
+extern Obj NIL, free_index, True, False, env, val, unev, argl, proc, expr, root, prim_proc, stack, conscell, tmp1, tmp2, tmp3;
 
 extern int verbose;
 

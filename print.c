@@ -219,6 +219,9 @@ void mkgraph() {
   fprintf(fp, "stack [style=filled, color=\"cyan\"];\n");
   fprintf(fp, "conscell [style=filled, color=\"cyan\"];\n");
   fprintf(fp, "cont [style=filled, color=\"cyan\"];\n");
+  fprintf(fp, "tmp1 [style=filled, color=\"cyan\"];\n");
+  fprintf(fp, "tmp2 [style=filled, color=\"cyan\"];\n");
+  fprintf(fp, "tmp3 [style=filled, color=\"cyan\"];\n");
 
   fprintf(fp, "\n");
   for (i = 0; i < free_index; i++) {
@@ -239,6 +242,9 @@ void mkgraph() {
   fprintf(fp, "stack -> %d:car\n", objval(stack));
   fprintf(fp, "conscell -> %d:car\n", objval(conscell));
   fprintf(fp, "cont -> %d:car\n", objval(cont));
+  fprintf(fp, "tmp1 -> %d:car\n", objval(tmp1));
+  fprintf(fp, "tmp2 -> %d:car\n", objval(tmp2));
+  fprintf(fp, "tmp3 -> %d:car\n", objval(tmp3));
 
   fprintf(fp, "}\n");
   fclose(fp);

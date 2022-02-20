@@ -22,7 +22,7 @@
 #include "hashtab.h"
 #include "gc.h"
 
-Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, root, stack, conscell, tmp1, tmp2;
+Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, root, stack, conscell, tmp1, tmp2, tmp3;
 Continuation cont;
 
 char *continuation_string[] = {
@@ -128,43 +128,106 @@ Obj mkproc(Obj parameters, Obj body, Obj env) { // a procedure is a triple (para
   return cons(PROCEDURE_SYM, tmp1);
 }
 
+// Either we write append so that the gc doesn't remove any references from us,
+// or we make sure that gc isn't invoked during append by checking there is enough
+// space before append runs
 
 // append '(1 2 3) '(4 5 6) => (1 2 3 4 5 6)
+// cons(1, cons(2, cons(3, '(4 5 6))))
+
+
 Obj append(Obj l, Obj m) {
-  // return (l == NIL ? m : cons(car(l), append(cdr(l), m)));
+  if (l == NIL)
+    return m;
+  Obj head = l;
+  while (cdr(l) != NIL)
+    l = cdr(l);
+  cdr(l) = m;
+  return head;
+}
+
+
+Obj append2(Obj, Obj);
+Obj appendy(Obj l, Obj m) {
+  printf("append: l = "); display(l); printf(" m = "); display(m);
+  Obj r = append2(l, m);
+  printf(" => "); display(r); NL;
+  return r;
+}
+
+Obj append2(Obj l, Obj m) {
+  // return (l == NIL ? m : cons(car(l), append(cdr(l), m)));  
+  if (l == NIL)
+    return m;
+  tmp1 = car(l);
+  push(tmp1);
+  tmp2 = append2(cdr(l), m);
+  tmp1 = pop();
+  return cons(tmp1, tmp2);
+}
+
+
+Obj appendx(Obj l, Obj m) {
+  return (l == NIL ? m : cons(car(l), append(cdr(l), m)));
+
   if (l == NIL)
     return m;
   push(car(l));
-  Obj t = append(cdr(l), m);
+  Obj t = append2(cdr(l), m);
   Obj h = pop();
   return cons(h, t);
 }
 
 Obj adjoin_arg(Obj arg, Obj arglist) {
   return append(arglist, cons(arg, NIL));
-  //  tmp1 = cons(arg, NIL);	/* should be able to simplify */
-  //  return append(arglist, tmp1);
+  tmp1 = cons(arg, NIL);	/* should be able to simplify */
+  return append(arglist, tmp1);
 }
 
 Continuation label;
 
 Obj pairup(Obj vars, Obj vals) {
+  //  printf("pairup: vars = "); display(vars); NL;
+  //  printf("pairup: vals = "); display(vals); NL;
   if (vars == NIL)
     return NIL;
-  push(cons(car(vars), car(vals)));
+  tmp1 = car(vars);
+  //  printf("pairup: car vars = "); display(tmp1); NL;
+  tmp2 = car(vals);
+  //  printf("pairup: car vals = "); display(tmp2); NL;  
+  tmp1 = cons(tmp1, tmp2);
+  //  printf("pairup: pushing tmp1 = "); display(tmp1); NL;
+  push(tmp1);
   tmp2 = pairup(cdr(vars), cdr(vals));
   tmp1 = pop();
+  //  printf("pairup: popping tmp1 = "); display(tmp1); NL;
+  //  printf("pairup: tmp2 = "); display(tmp2); NL;  
   tmp2 = cons(tmp1, tmp2);
+  //  printf("pairup: tmp2 = "); display(tmp2); NL;
+  // printf("pairup returns "); display(tmp2); NL;
   return tmp2;
 }
 
-Obj bind(Obj vars, Obj vals, Obj env) {
+Obj bind(Obj vars, Obj vals, Obj environment) {
+  /*
+  if (objtype(vars) != PAIR_TAG)                // ((lambda l body) '(1 2 3)) => bind l/'(1 2 3)
+    return append(pairup(cons(vars, NIL), cons(vals, NIL)), environment);
+  else                                          // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3
+    return append(pairup(vars, vals), environment);
+  */
+  
   if (objtype(vars) != PAIR_TAG) {               // ((lambda l body) '(1 2 3)) => bind l/'(1 2 3)
+    tmp3 = environment;
     tmp1 = cons(vars, NIL);
     tmp2 = cons(vals, NIL);
-    return append(pairup(tmp1, tmp2), env);
-  } else                                          // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3 
-    return append(pairup(vars, vals), env);
+    tmp2 = pairup(tmp1, tmp2);
+    return append(tmp2, tmp3);
+  } else {                                      // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3
+    push(environment);
+    tmp1 = pairup(vars, vals);   // <--- uses tmp1 and tmp2
+    environment = pop();
+    return append(tmp1, environment);
+  }
 }
 
 void prepend(Obj x, Obj l) {
@@ -245,6 +308,7 @@ void update_rootset() {
   car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root)))))))))) = cont;
   car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root))))))))))) = tmp1;
   car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root)))))))))))) = tmp2;
+  car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root))))))))))))) = tmp3;
   
   //  printf("update_rootset: ROOT = %d\n", objval(root));  
 }
@@ -263,11 +327,12 @@ void restore_rootset() {
   cont =      car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root))))))))));
   tmp1 =      car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root)))))))))));
   tmp2 =      car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root))))))))))));
+  tmp3 =      car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root)))))))))))));
 }  
 
 void init_symbols() {
   // the root object is a list of all registers which points into memory
-  root = cons(env, cons(val, cons(unev, cons(argl, cons(proc, cons(expr, cons(prim_proc, cons(stack, cons(conscell, cons(cont, cons(tmp1, cons(tmp2, NIL))))))))))));
+  root = cons(env, cons(val, cons(unev, cons(argl, cons(proc, cons(expr, cons(prim_proc, cons(stack, cons(conscell, cons(cont, cons(tmp1, cons(tmp2, cons(tmp3, NIL)))))))))))));
 
   False = mkbool("#f");
   True = mkbool("#t");
@@ -448,8 +513,15 @@ void eval_dispatch() {
       display_registers("COMPOUND_APPLY");
       unev = cadr(proc);      /* procedure parameters */
       env = cadddr(proc);     /* procedure environment */
+      // display_registers("COMPOUND_APPLY [2]");
+      // printf("unev: "); display(unev); NL;
+      // printf("argl: "); display(argl); NL;
+      // printf("env:  "); display(env);  NL;
       env = bind(unev, argl, env);   /* bind formals to arguments */
+      // printf("env2:  "); display(env);  NL;
+      // display_registers("COMPOUND_APPLY [3]");
       unev = caddr(proc);     /* procedure body */
+      // display_registers("COMPOUND_APPLY [4]");
       label = EV_SEQUENCE;
       continue;
 
@@ -753,6 +825,7 @@ Token scan() {
       *p = 0;
       // a number is an optional + or - followed by at least one or more digits
       // these are numbers: 1, -1, +1, -12 but these are not -, -1x, +, ++
+      cc = 0;
       if (sscanf(id, "%d%c", &nval, &cc) == 1 && cc == 0)
 	return (token = NUM);
       return (token = ID);
@@ -902,6 +975,26 @@ int main(int argc, char *argv[]) {
     libloaded = 1;
   }
   //  printf("testing readline:\n");  char* input = readline("prompt> ");  printf("%s\n", input);
+
+  Obj tmp1 = cons(mksym("a"), cons(mksym("b"), cons(mksym("c"), NIL)));
+  Obj tmp2 = cons(mknum(1), cons(mknum(2), cons(mknum(3), NIL)));
+  Obj tmp3 = NIL;
+
+  /*
+  push(tmp1); push(tmp2); push(tmp3);
+  argl = bind(tmp1, tmp2, tmp3);
+  tmp3 = pop(); tmp2 = pop(); tmp1 = pop();
+  push(tmp1); push(tmp2); push(tmp3);  
+  printf("argl: "); display(argl); NL;
+  argl = bind(tmp1, tmp2, argl);
+  tmp3 = pop(); tmp2 = pop(); tmp1 = pop();
+  push(tmp1); push(tmp2); push(tmp3);    
+  printf("argl: "); display(argl); NL;
+  tmp3 = pop(); tmp2 = pop(); tmp1 = pop();
+  argl = bind(tmp1, tmp2, argl);
+  printf("argl: "); display(argl); NL;  
+  printf("done\n");
+  */
 
   /*
   push(mknum(1));

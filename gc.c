@@ -7,14 +7,17 @@
 
 void gc() {
   Obj scan, alloc;		/* indices into newcars/newcdrs */
-  printf("[GC]\n");
+  //  printf("[GC]\n");
   //  dump_memory();
+  /*
   printf("\nBefore: expr = "); display(expr); 
   printf(" val = "); display(val); 
   printf(" argl = "); display(argl);
   printf(" proc = "); display(proc);
   printf(" cont = "); display(cont);
+  printf(" env = "); display(env);
   printf(" unev = "); display(unev); NL;
+  */
 
   update_rootset();
   //  display(root);
@@ -72,7 +75,7 @@ void gc() {
     // printf("scan = %d, alloc = %d\n", scan, alloc);
     //    dump_memory();
   }
-  printf("[GC finished: compressed %d cells down to %d]\n", MEMSIZE, alloc);
+  printf("[GC: compressed %d cells down to %d]\n", MEMSIZE, alloc);
   if (alloc > MEMSIZE - 1) {
     fprintf(stderr, "Sorry - memory is full, even after GC\n");
     exit(1);
@@ -87,14 +90,17 @@ void gc() {
   newcdrs = t;
 
   restore_rootset();
+  /*
   printf("\nAfter: expr = "); display(expr); 
   printf(" val = "); display(val); 
   printf(" argl = "); display(argl);
   printf(" proc = "); display(proc);
   printf(" cont = "); display(cont);
+  printf(" env = "); display(env);
   printf(" unev = "); display(unev); NL;
+  */
 
-  //dump_memory();
+  // dump_memory();
   return;
 }
 
