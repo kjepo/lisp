@@ -1,13 +1,17 @@
-# explicit LISP
+# explicit Lisp
 
-This is an exercise in building a LISP machine in a series of steps
-so that ultimately we _could_ write it in assembler.
+This is an exercise in building a Lisp machine in a series of steps
+so that (ultimately) we _could_ write it in assembler.
 
-The code in `explicit.scm` is a register machine implementation
-of a LISP interpreter written in Scheme.
+The original code in `explicit.scm` is a register machine implementation
+of a Lisp interpreter written in Scheme.
 Rather than the usual recursive apply/eval description of the interpreter,
 we have made the control and arguments explicit.
 The code is based on SICP, chapter 5 (and forwards).
+
+(If you are not familiar with the traditional eval/apply rendition of a
+Lisp interpreter, please watch "The most beautiful program ever written"
+by William Byrd, [https://www.youtube.com/watch?v=OyfBQmvr2Hc])
 
 The next step is to write the same code in C (file `lisp.c`).
 The code is not finished yet but a rudimentary interpreter is working
@@ -46,7 +50,7 @@ where `ID` is an identifier (letters optionally followed by letters and digits, 
 where letters also include the special characters `#+-.*/<=>!?:$%_&~^`,
 `NUMBER` is an optional sign (`+` or `-`) followed by one or more digits,
 and `STRING` is a `"`-enclosed string which can contain the usual escape
-sequences `\n`, `t`, etc.
+sequences `\n`, `t`, etc. Comments begin with `;` and run to the end of the line.
 
 There are some built-in constants and primitives:
 
@@ -111,7 +115,6 @@ The interpreter handles _objects_ which can be
 - pairs of objects, i.e., cons cells
 - symbols, i.e., `foo`, `-1+`, or `set!`
 - numbers, i.e., `42`, `-17` or `+3`
-- procedures, which are the result of evaluating `lambda`-expressions
 - primitives, i.e., `car`, `cdr`, `cons`, etc
 - strings, i.e., `"hello world\n"`
 - booleans, i.e., `#t` and `#f`
@@ -170,53 +173,74 @@ makes traversing a list more time consuming.
 For integers, we still have to add the three missing (most significant) bits for negative
 numbers when we get rid of the tag by shifting.
 We _could_ use `000` as the tag for numbers and apply addition, subtraction, etc on the 
-tagged numbers but LISP program typically don't do a lot of number crunching so we
+tagged numbers but Lisp program typically don't do a lot of number crunching so we
 reserve the tag `000` for pairs instead.
 
 # Garbage collection
 
-This Lisp uses Cheney's Stop-and-Copy algorithm for garbage collection. An alternative would have
-been Mark and Sweep. Both have its pros and cons:
+This Lisp uses Cheney's Stop-and-Copy algorithm for garbage collection. 
+An alternative would have been Mark-and-sweep.  Let's give a brief overview of
+both algorithms, along with their pros and cons:
 
-- Stop-and-Copy moves objects (which can be a problem as we'll discuss in a minute) and also
-uses half of the memory to copy used objects into. However, after Stop-and-Copy has run, the
-objects have been compacted together and there's no need to maintain a free list (a linked list
-of free cons cells).  Rather, a free index (where to allocate the next cons cell) is enough.
-Compacting objects also leads to fewer page faults.
+- Stop-and-copy divides the available memory into two halves.  When the first half is full,
+reachable objects are moved into the empty second half.  What remains in the first half is
+non-reachable objects which represents old cells that no longer is used.  The first half
+is wiped clean, the two halves are swapped and execution continues.
 
-- Mark and Sweep, if implemented correctly needs a complicated pointer reversal algorithm to
+During stop-and-copy garbage collection the reachable objects are placed adjacent 
+to each other in the second half.  Packing objects together leads to fewer page faults,
+but by actually moving the objects, i.e., changin their addresses,  we can get into 
+trouble, as we will discuss in a minute.
+
+- Mark-and-sweep, if implemented correctly needs a complicated pointer reversal algorithm to
 run in O(1) space. Also, free cons cells must be kept in a linked list as objects don't move.
-But the fact that object doesn't move is very useful, as we will discuss next.
+In contrast, with Stop-and-copy, we have a large contiguous free memory area where larger
+objects can be allocatd without fragmentation problems.
+But the fact that objects don't move in Mark-and-sweep is very useful, as we will discuss next.
 
 Debugging garbage collection is a really hard: if there's a bug in the actual garbage collector,
-the memory will be thrashed and there's no journal of what has happened.  And if the stop-and-copy
+the memory will be thrashed and there's no journal of what happened.  And even if the stop-and-copy
 garbage collector runs correctly, the rest of the code must take into consideration that any 
-reference to memory will be stale afterwards.  We maintain a so called *root set*, a list of objects
-that we can retrieve afterwards to re-assign important variables.
+reference to memory will be stale afterwards. 
 
-At the heart of the interpreter is `cons` which creates a cons cell. If `cons` notices that it is
-out of memory, it invokes the garbage collector. So every time we call a function that 
-(transitively) calls `cons`, garbage collection can be triggered. 
-Therefore, code like this is highly dangerous:
+At the heart of the interpreter is `cons()` which creates one (1) cons cell. 
+If `cons()` notices that it is out of memory, it invokes the garbage collector. 
+
+```
+Obj cons(Obj car_, Obj cdr_) {
+  thecars[free_index] = car_;
+  thecdrs[free_index] = cdr_;
+  conscell = mkpair(free_index);
+  if (++free_index >= MEMSIZE)
+    gc();
+  return conscell;
+}
+```
+
+Thus, every time we call a function that (transitively) calls `cons`, garbage collection 
+can be triggered. Therefore, code like this is highly dangerous:
 
 ```
 void foo(Obj p) {
   Obj r = cons(...);
 }
 ```
-If the call the `cons` triggers garbage collection we can probably say goodbye to `p`!
+If the call to `cons` triggers garbage collection we can probably say goodbye to `p`!
 Even calling `cons(x,y)` means that you that you can't use `x` and `y` afterwards.
 
 Enter the *root set*.
 
-The root set is a list of global variables which we can recover after garbage collection.
-In our case, `root` is a list 
+The root set is a list of global variables which we can find after garbage collection.
+The stop-and-copy algorithms works by first placing the root set in the empty half.
+It then follows all references from the root set, copying reachable objects into the empty half.
+
+In our case, the root set is a list
 `env val unev argl proc expr prim_proc stack cont conscell tmp1 tmp2 tmp3`.
 The first 10 objects in this list belong to the register machine (which is described in SICP).
 The last four, `conscell`, `tmp1`, `tmp2` and `tmp3`, are global variables that we can use
 to safely maintain a reference to an object, if garbage collection is suddenly invoked.
 
-It works like this: before garbage collection starts, the root set is updated with the current
+In detail, before garbage collection starts, the root set is updated with the current
 values of the variables above. The root set is then placed at the beginning (index 1) of the new memory 
 where live objects are later copied into. After garbage collection, when the dust has settled,
 we can retrieve the root set again at index 1 in the new space. 
@@ -225,33 +249,19 @@ A word of warning: the variables `tmp1`, `tmp2` and `tmp3` are globals so you ca
 in a recursive function.  By now, you should realize that the sudden invocation of the
 stop-and-copy garbage collector makes it a bit tricky to write the interpreter because you
 never know when the rug will be pulled under your feet!  Based on my limited experience
-there are two ways of dealing with this "threat":
+there are two methods (both useful) of dealing with this "threat":
 
-- write your interpreter code without recursion and use the `tmp` variables for any references.
+- Write your interpreter code without recursion and use the `tmp` variables for any references.
 
-- call the function `need(n)` to make sure that `n` cells can be allocated without the garbage
+- Call the function `gc_need(n)` to make sure that `n` cells can be allocated without the garbage
 collector being invoked:
 
 ```
-void need(int n) {
+void gc_need(int n) {
   if (free_index + n >= MEMSIZE)
     gc();
   if (free_index + n >= MEMSIZE)
     error("Out of memory");
-}
-```
-
-And here is the code for `cons`:
-
-```
-Obj cons(Obj car_, Obj cdr_) {
-  thecars[free_index] = car_;
-  thecdrs[free_index] = cdr_;
-  conscell = mkpair(free_index);
-  free_index++;
-  if (free_index >= MEMSIZE)
-    gc();
-  return conscell;
 }
 ```
 
@@ -260,7 +270,6 @@ Obj cons(Obj car_, Obj cdr_) {
 While I'm not aiming to write a fully fledged Scheme interpreter there
 are a few things I'd like to do:
 
-- Add garbage collection
 - Catch C-c and use GNU's readline library to parse input from stdin.
 - `call/cc`
 - Special forms needed for `and`, `or`, `not`.
