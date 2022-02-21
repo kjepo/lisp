@@ -10,24 +10,21 @@
 
 typedef uint32_t Obj;
 
-// tagged pointers, you should let PAIR_TAG = 0 or all bets are off
+// tagged pointers - you should let PAIR_TAG = 0 or all bets are off
 #define PAIR_TAG   0
 #define SYMBOL_TAG 1
 #define NUM_TAG    2
-#define BROKEN_TAG 3
-#define PRIM_TAG   4
-#define STR_TAG    5
-#define BOOL_TAG   6
-#define ARRAY_TAG  7
-
-// use the PRIM_TAG with the highest number for broken heart
-#define BROKENHEART 0xfffffff4
+#define PRIM_TAG   3
+#define STR_TAG    4
+#define BOOL_TAG   5
+#define ARRAY_TAG  6
+#define BROKEN_TAG 7		/* broken heart tag for garbage collector */
 
 extern int objtype(Obj);
 extern int objval(Obj);
 extern int is_pair(Obj);
 extern int is_compound(Obj);
-extern Obj mkpair(int);
+extern Obj mkpointer(int);
 extern void update_rootset();
 extern void restore_rootset();
 

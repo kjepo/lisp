@@ -8,7 +8,7 @@
 #include "print.h"
 
 void display2(Obj expr, int dotted) {
-  if (expr == BROKENHEART) {
+  if (expr == BROKEN_TAG) {
     printf("XXX");
     return;
   }
@@ -41,23 +41,7 @@ void display2(Obj expr, int dotted) {
     printf("%d", objval(expr));
     break;
   case BROKEN_TAG:
-    if (expr && car(expr)) {
-      printf("λ");
-      display(car(expr));
-    } else
-      printf("λ()");
-    printf(".");
-    if (expr && cdr(expr) && cadr(expr))
-      display(cadr(expr));      
-    else
-      printf("NULL");
-    printf(",env");
-    /*
-    if (expr && cdr(objval(expr)) && cddr(objval(expr)) && caddr(objval(expr)))
-      display(caddr(objval(expr)));
-    else
-      printf("NULL");
-    */
+    printf("XXX ");
     break;
   case PRIM_TAG:
     printf("<primitive #%d>", objval(expr));
@@ -82,7 +66,6 @@ void display_registers(char *where) {
   if (!verbose)
     return;
   printf("===============================%s=\n", where);
-    
   printf("expr: "); display(expr); NL;
   printf("env:  "); display(env); NL;
   printf("cont: "); printf("%s\n", continuation_string[objval(cont)]);
@@ -90,19 +73,11 @@ void display_registers(char *where) {
   printf("unev: "); display(unev); NL;
   printf("argl: "); display(argl); NL;
   printf("proc: "); display(proc); NL;
-  //  printf("stack "); display(stack); NL;
-  /*
-  for (int i = 0; i < StackPtr; i++) {
-    printf("[");
-    display(Stack[i]);
-    printf("] ");
-  }
-  NL; */
   printf("========================================\n");
 }
 
 void dumpval(Obj n) {
-  if (n == BROKENHEART) {
+  if (n == BROKEN_TAG) {
     printf("XXX ");
     return;
   }
@@ -200,9 +175,7 @@ void mkgraph() {
   fprintf(fp, "page=\"8,11!\";\n");
   fprintf(fp, "ratio=compress;\n");
   fprintf(fp, "margin=0;\n");
-  // fprintf(fp, "ranksep=1\n");
   fprintf(fp, "rankdir=LR\n");
-  // fprintf(fp, "node [fontsize=6, shape=record]\n\n");
   fprintf(fp, "node [shape=record]\n\n");  
 
   for (i = 0; i < free_index; i++)
@@ -245,7 +218,6 @@ void mkgraph() {
   fprintf(fp, "tmp1 -> %d:car\n", objval(tmp1));
   fprintf(fp, "tmp2 -> %d:car\n", objval(tmp2));
   fprintf(fp, "tmp3 -> %d:car\n", objval(tmp3));
-
   fprintf(fp, "}\n");
   fclose(fp);
 }

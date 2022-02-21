@@ -34,6 +34,13 @@
           (display " in file ")
           (display (car (cdr (file))))
           (newline)
+	  (display x) (display " ") (display y) (newline)
+	  (display (cadr x)) (display " ") (display (cadr y)) (newline)
+	  (display (caddr x)) (display " ") (display (caddr y)) (newline)
+	  (display (equal? x y)) (newline)
+	  (display (car x)) (display " ") (display (car y)) (newline)
+	  (display (eq? (car x) (car y))) (newline)
+	  (newline)
           (exit)))))
 
 ;;; some basic sanity checking of built-in functions
@@ -175,5 +182,7 @@
         (cons (f (car l)) (map f (cdr l))))))
 
 (assert (map abs '(-3 1 -4)) '(3 1 4))
+
+(assert (map zero? '(0 1 2)) '(#t #f #f))
 
 (display "lib.scm loaded\n")

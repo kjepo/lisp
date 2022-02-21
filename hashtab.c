@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include "hashtab.h"
 
-#define HASHTABSIZ 100
+#define HASHTABSIZ 1000
 
 struct {
   char *id;

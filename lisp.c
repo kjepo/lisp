@@ -6,6 +6,7 @@
   * ======================
   * Dotted pairs can't be read
   * One token lookahead prevents friendly REPL, use GNU readline instead
+  * lineno is off - write a nextchar()
   * Catch C-c to stop interpreter and return to REPL
   * call/cc
   * Rewrite makefile
@@ -23,7 +24,9 @@
 #include "hashtab.h"
 #include "gc.h"
 
-Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, root, stack, conscell, tmp1, tmp2, tmp3;
+Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, root, stack, conscell;
+Obj tmp1, tmp2, tmp3, prim_proc;
+
 Continuation cont, label;
 
 int verbose = 0;
@@ -57,12 +60,12 @@ void unbound(Obj id) {
   longjmp(jmpbuf, 1);
 }
 
-Obj mkpair(int p) { return ((p) << 3) | PAIR_TAG; }
+Obj mkpointer(int p) { return ((p) << 3) | PAIR_TAG; }
 
 Obj cons(Obj car_, Obj cdr_) {
   thecars[free_index] = car_;
   thecdrs[free_index] = cdr_;
-  conscell = mkpair(free_index);
+  conscell = mkpointer(free_index);
   free_index++;
   if (free_index >= MEMSIZE)
     gc();
@@ -94,7 +97,7 @@ Obj pop() {
   }
 }
 
-void need(int n) {
+void gc_need(int n) {
   if (free_index + n >= MEMSIZE)
     gc();
   if (free_index + n >= MEMSIZE)
@@ -103,7 +106,7 @@ void need(int n) {
 
 Obj mkproc(Obj parameters, Obj body, Obj env) { // a procedure is a triple (parameters body env)
   tmp1 = env;  tmp2 = body;  tmp3 = parameters;
-  need(5);
+  gc_need(5);
   parameters = tmp3; body = tmp2; env = tmp1;
   return cons(PROCEDURE_SYM, cons(parameters, cons(body, cons(env, NIL))));
 }
@@ -120,7 +123,7 @@ Obj concat(Obj l, Obj m) {	// destructive append, sets the cdr of l to m (unless
 
 Obj adjoin_arg(Obj arg, Obj arglist) {
   tmp1 = arg; tmp2 = arglist;
-  need(2);
+  gc_need(2);
   arg = tmp1; arglist = tmp2;
   return concat(arglist, cons(arg, NIL));
 }
@@ -138,10 +141,8 @@ int length(Obj p) {
 Obj pairup_aux(Obj vars, Obj vals) {
   if (vars == NIL)
     return NIL;
-  else {
-    return cons(cons(car(vars), car(vals)),
-		pairup_aux(cdr(vars), cdr(vals)));
-  }
+  else
+    return cons(cons(car(vars), car(vals)), pairup_aux(cdr(vars), cdr(vals)));
 }
 
 Obj pairup(Obj vars, Obj vals) {
@@ -152,64 +153,44 @@ Obj pairup(Obj vars, Obj vals) {
   if (m != n) {
     display(vars); printf(" "); display(vals); NL;
     error("Error: length mismatch between parameters and arguments");
+    return NIL; 		// not reached
   } else {
     tmp1 = vars;
     tmp2 = vals;
-    need(2*n);
-    Obj r = pairup_aux(tmp1, tmp2);
-    return r;
+    gc_need(2*n);
+    return pairup_aux(tmp1, tmp2);
   }
 }
 
-#define PR(x, xs)    printf("bind: %s =", xs); display(x);
-
 Obj bind(Obj vars, Obj vals, Obj environment) {
-  /*
-  if (objtype(vars) != PAIR_TAG)                // ((lambda l body) '(1 2 3)) => bind l/'(1 2 3)
-    return concat(pairup(cons(vars, NIL), cons(vals, NIL)), environment);
-  else                                          // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3
-    return concat(pairup(vars, vals), environment);
-  */
-
-  tmp1 = vars; tmp2 = vals; tmp3 = environment;
-  need(1003);
-  environment = tmp3; vals = tmp2; vars = tmp1;
-
-
-  if (objtype(vars) != PAIR_TAG) {               // ((lambda l body) '(1 2 3)) => bind l/'(1 2 3)
+  if (objtype(vars) != PAIR_TAG) {   // ((lambda l body) '(1 2 3)) => bind l/'(1 2 3)
     tmp3 = environment;
     tmp1 = cons(vars, NIL);
     tmp2 = cons(vals, NIL);
     tmp2 = pairup(tmp1, tmp2);
     return concat(tmp2, tmp3);
-  } else {                                      // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3
-    //    PR(environment, "environment"); NL; PR(vars, "vars"); NL; PR(vals, "vals"); NL;
-    push(environment);
-    //    printf("====after push\n"); PR(environment, "environment"); NL; PR(vars, "vars"); NL; PR(vals, "vals"); NL;
-    tmp1 = pairup(vars, vals);   // <--- uses tmp1 and tmp2
-    //    printf("====after pairup\n"); PR(tmp1, "tmp1"); NL;
-    environment = pop();
-    //    PR(environment, "environment"); NL;
+  } else {                           // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3
+    tmp3 = environment;
+    tmp1 = pairup(vars, vals);       // <--- uses tmp1 and tmp2
+    environment = tmp3;
     return concat(tmp1, environment);
   }
 }
 
 void prepend(Obj x, Obj l) {
-  need(104);
-  tmp1 = x;
-  tmp2 = l;
-  Obj first = car(tmp2);
-  Obj rest = cdr(tmp2);
+  Obj first = car(l);
+  Obj rest = cdr(l);
+  tmp1 = x; tmp2 = l;
   conscell = cons(first, rest);
-  car(tmp2) = tmp1;
-  cdr(tmp2) = conscell;
+  x = tmp1; l = tmp2;
+  car(l) = x;
+  cdr(l) = conscell;
 }
 
 void add_binding(Obj var, Obj val, Obj env) {
-  // tmp1 = cons(var, val);
-  need(105);
-  prepend(cons(var, val), env);
-  //  prepend(tmp1, env);
+  tmp1 = env;
+  tmp2 = cons(var, val);
+  prepend(tmp2, tmp1);
 }
 
 // find the first pair in env whose car equals var and return that pair (or NIL, if not found)
@@ -222,7 +203,7 @@ Obj assoc(Obj var, Obj env) {
     return assoc(var, cdr(env));
 }
 
-Obj env_lookup(Obj var, Obj env) {      /* env[var] */
+Obj env_lookup(Obj var, Obj env) {      // env[var]
   Obj pair = assoc(var, env);
   if (pair == NIL) {
     unbound(var);
@@ -242,26 +223,12 @@ void set_variable_value(Obj var, Obj val, Obj env) {
 void define_variable(Obj var, Obj val, Obj env) {
   Obj pair = assoc(var, env);
   if (pair != NIL)
-    cdr(pair) = val;            /* overwrite old definition */
+    cdr(pair) = val;            // overwrite old definition
   else
     add_binding(var, val, env);
 }
 
-//void push(Obj value) {
-//  Stack[StackPtr++] = value;
-//  if (StackPtr > sizeof(Stack)/sizeof(Stack[0]))
-//    error("Stack overflow!");
-//}
-
-//Obj pop() {
-//  if (StackPtr <= 0)
-//    error("Stack underflow!");
-//  return Stack[--StackPtr];
-//}
-
-
-// Update root set with current values for env, val, unev, argl, proc and expr
-void update_rootset() {
+void update_rootset() {         // Update root set with current values for registers
   car(root) = env;
   car(cdr(root)) = val;
   car(cdr(cdr(root))) = unev;
@@ -275,12 +242,10 @@ void update_rootset() {
   car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root))))))))))) = tmp1;
   car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root)))))))))))) = tmp2;
   car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root))))))))))))) = tmp3;
-  
-  //  printf("update_rootset: ROOT = %d\n", objval(root));  
 }
 
 void restore_rootset() {
-  root =      mkpair(1);
+  root =      mkpointer(1);
   env =       car(root);
   val =       car(cdr(root));
   unev =      car(cdr(cdr(root)));
@@ -298,7 +263,8 @@ void restore_rootset() {
 
 void init_symbols() {
   // the root object is a list of all registers which points into memory
-  root = cons(env, cons(val, cons(unev, cons(argl, cons(proc, cons(expr, cons(prim_proc, cons(stack, cons(conscell, cons(cont, cons(tmp1, cons(tmp2, cons(tmp3, NIL)))))))))))));
+  root = cons(env, cons(val, cons(unev, cons(argl, cons(proc, cons(expr, cons(prim_proc,
+    cons(stack, cons(conscell, cons(cont, cons(tmp1, cons(tmp2, cons(tmp3, NIL)))))))))))));
 
   False = mkbool("#f");
   True = mkbool("#t");
@@ -328,10 +294,7 @@ void init_symbols() {
   argl = NIL;
   proc = NIL;
   stack = NIL;
-  // StackPtr = 0;
 }
-
-Obj prim_proc;
 
 void init_env() {
   // an environment BINDING id -> value is represented simply as cons(id, value)
@@ -363,7 +326,6 @@ int is_str(Obj p)        { return STR_TAG == objtype(p); }
 int is_bool(Obj p)       { return BOOL_TAG == objtype(p); }
 int is_variable()        { return SYMBOL_TAG == objtype(expr); }
 int is_primitive(Obj p)  { return PRIM_TAG == objtype(p); }
-//int is_compound(Obj p)   { return PROC_TAG == objtype(p); }
 int is_compound(Obj p)   { return is_pair(p) && PROCEDURE_SYM == car(p); }
 int is_nil(Obj p)        { return p == NIL; }
 int is_pair(Obj p)       { return PAIR_TAG == objtype(p) && !is_nil(p); }
@@ -402,7 +364,7 @@ void prim_times()   { val = mknum(ensure_numerical(car(argl), "times") * ensure_
 void prim_eq()      { val = ensure_numerical(car(argl), "=") == ensure_numerical(cadr(argl), "=") ? True : False; }
 void prim_lt()      { val = ensure_numerical(car(argl), "<") < ensure_numerical(cadr(argl), "<") ? True : False; }
 void prim_gt()      { val = ensure_numerical(car(argl), ">") > ensure_numerical(cadr(argl), ">") ? True : False; }
-void prim_eqp()     { val = car(argl) == cadr(argl) ? True : False; }
+void prim_eqp()     { val = (objval(car(argl)) == objval(cadr(argl))) ? True : False; }
 void prim_car()     { verify_list(car(argl), "car"); val = car(car(argl)); }
 void prim_cdr()     { verify_list(car(argl), "cdr"); val = cdr(car(argl)); }
 void prim_cons()    { val = cons(car(argl), cadr(argl)); }
@@ -418,7 +380,7 @@ void (*primitives[])() = {
   prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq, prim_eqp,
   prim_lt, prim_gt, prim_display, prim_numberp, prim_symbolp, prim_nullp, prim_exit, prim_file };
 
-void eval_dispatch() {
+void eval() {
   label = EVAL_DISPATCH;
   cont = mknum(PRINT_RESULT);
   for (;;) {
@@ -480,14 +442,8 @@ void eval_dispatch() {
       unev = cadr(proc);      /* procedure parameters */
       env = cadddr(proc);     /* procedure environment */
       display_registers("COMPOUND_APPLY [2]");
-      //      printf("unev: "); display(unev); NL;
-      //      printf("argl: "); display(argl); NL;
-      //      printf("env:  "); display(env);  NL;
       env = bind(unev, argl, env);   /* bind formals to arguments */
-      //      printf("env2:  "); display(env);  NL;
-      // display_registers("COMPOUND_APPLY [3]");
       unev = caddr(proc);     /* procedure body */
-      // display_registers("COMPOUND_APPLY [4]");
       label = EV_SEQUENCE;
       continue;
 
@@ -539,10 +495,7 @@ void eval_dispatch() {
     case EV_APPL_ACCUM_LAST_ARG:
       display_registers("EV_APPL_ACCUMULATE_LAST_ARG");
       argl = pop();
-      //      PR(argl, "argl"); NL;
-      //      PR(val, "val"); NL;
       argl = adjoin_arg(val, argl);
-      //      PR(argl, "argl"); NL;
       proc = pop();
       label = APPLY_DISPATCH;
       display_registers("EV_APPL_ACCUMULATE_LAST_ARG [2]");
@@ -568,11 +521,11 @@ void eval_dispatch() {
 
     case EV_IF:
       display_registers("EV_IF");
-      push(expr);               /* save expression for later */
+      push(expr);               // save expression for later 
       push(env);
       push(cont);
       cont = mknum(EV_IF_DECIDE);
-      expr = cadr(expr);        /* if-predicate */
+      expr = cadr(expr);        // if-predicate
       label = EVAL_DISPATCH;
       continue;
 
@@ -601,9 +554,9 @@ void eval_dispatch() {
 
     case EV_ASSIGNMENT:
       display_registers("EV_ASSIGNMENT");
-      unev = cadr(expr);        /* assignment variable */
+      unev = cadr(expr);        // assignment variable 
       push(unev);
-      expr = caddr(expr); /* assignment value */
+      expr = caddr(expr);	// assignment value 
       push(env);
       push(cont);
       cont = mknum(EV_ASSIGNMENT_1);
@@ -708,11 +661,6 @@ void eval_dispatch() {
   }
 }
 
-void eval() {
-  // display(expr); NL;
-  eval_dispatch();
-}
-
 // scanner and parser for LISP-style input
 typedef enum toktype {
   END, ID, NUM, STR, CR, LPAR = '(', RPAR = ')', DOT = '.', PLUS = '+', MINUS = '-', TICK = '\''
@@ -723,29 +671,33 @@ char id[80];                    // string value when token == ID
 int nval;                       // numeric value when token == NUM
 
 int legal_symbol_start(char ch) { return isalpha(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }   
-int legal_symbol_rest(char ch) { return isalnum(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }   
+int legal_symbol_rest(char ch)  { return isalnum(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }   
 
-Token scan() {
-  char *p;
-  char ch, lastchar;
-
- start_scan:
-  do {                          /* skip whitespace */
-    if (EOF == (ch = fgetc(fp)))
-      return token = END;
+char nextchar() {		// return next non-white space character, skip ; comments until end-of-line
+  char ch;
+  do {                          
+    if (EOF == (ch = fgetc(fp))) 
+      return END;		// EOF
     if (ch == '\n')
-      lineno++;
+      lineno++;			// count line numbers
   } while (isspace(ch));
 
-  if (ch == ';') {             /* ; means comment until end-of-line */
+  if (ch == ';') {		// ; means comment until end-of-line
     do {
-      if (EOF == (ch = fgetc(fp)))
-        return token = END;
-    if (ch == '\n')
-      lineno++;
+      ch = fgetc(fp);
     } while (ch != '\n');
-    goto start_scan;
+    lineno++;
+    return nextchar();
   }
+  return ch;
+}
+
+Token scan() {
+  char *p, ch, lastchar;
+
+  ch = nextchar();
+  if (ch == END)
+    return (token = END);
 
   switch (ch) {                 /* ch is not ";", whitespace or EOF */
   case '\"':
@@ -860,14 +812,12 @@ Obj parse() {
 }
 
 void rep() {
-  lineno = 1;
+  lineno = 0;
   scan();
   for (;;) {
-    expr = parse();
-    if (!expr)
+    if (!(expr = parse()))
       return;
-    env = prim_proc;           /// fixme: prim_proc address changes after gc
-    // there are probably other variables that index into thecars thru initial cons-operations
+    env = prim_proc;
     eval();
     if (fp == stdin)
       printf("===> ");
@@ -901,9 +851,6 @@ int main(int argc, char *argv[]) {
   init_symbols();
   init_env(); 
 
-  //  prim_proc = cons(NIL, NIL);  // can't be NIL (make space for 1 binding)  
-  //  add_binding(mksym("cons"), mkprim(PRIM_CONS), prim_proc);
-  
   fp = stdin;
   fname = "stdin";
 
@@ -944,56 +891,6 @@ int main(int argc, char *argv[]) {
     libloaded = 1;
   }
   //  printf("testing readline:\n");  char* input = readline("prompt> ");  printf("%s\n", input);
-
-  Obj tmp1 = cons(mksym("a"), cons(mksym("b"), cons(mksym("c"), NIL)));
-  Obj tmp2 = cons(mknum(1), cons(mknum(2), cons(mknum(3), NIL)));
-  Obj tmp3 = NIL;
-
-  /*
-  push(tmp1); push(tmp2); push(tmp3);
-  argl = bind(tmp1, tmp2, tmp3);
-  tmp3 = pop(); tmp2 = pop(); tmp1 = pop();
-  push(tmp1); push(tmp2); push(tmp3);  
-  printf("argl: "); display(argl); NL;
-  argl = bind(tmp1, tmp2, argl);
-  tmp3 = pop(); tmp2 = pop(); tmp1 = pop();
-  push(tmp1); push(tmp2); push(tmp3);    
-  printf("argl: "); display(argl); NL;
-  tmp3 = pop(); tmp2 = pop(); tmp1 = pop();
-  argl = bind(tmp1, tmp2, argl);
-  printf("argl: "); display(argl); NL;  
-  printf("done\n");
-  */
-
-  /*
-  push(mknum(1));
-  push(mknum(2));
-  push(mknum(3));
-  display(stack); NL;
-  printf("%d %d %d\n", objval(pop()), objval(pop()), objval(pop()));
-
-
-  Obj l1 = cons(mknum(1), cons(mknum(2), cons(mknum(3), NIL)));
-  Obj l2 = cons(mknum(101), cons(mknum(102), cons(mknum(103), NIL)));
-  Obj l3 = concat(l1, l2);
-  display(l3); NL;
-  l3 = concat(l1, NIL);
-  display(l3); NL;
-  l3 = concat(NIL, l2);
-  display(l3); NL;  
-  */
-
-  /*
-  for (int j = 10; j < 31; j += 2)
-    expr = cons(mknum(j), mknum(j+1));
-  printf("expr: "); display(expr); printf("should be 30, 31\n");
-  for (int j = 32; j < 53; j += 2)
-    expr = cons(mknum(j), mknum(j+1));
-  printf("expr: "); display(expr); printf("should be 52, 53\n");
-  for (int j = 54; j < 65; j += 2)
-    expr = cons(mknum(j), mknum(j+1));
-  printf("expr: "); display(expr); printf("should be 64, 65\n");  
-*/
 
  repl:
   fp = stdin;
