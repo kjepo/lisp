@@ -23,7 +23,7 @@
 #include "gc.h"
 
 Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, root, stack, conscell, tmp1, tmp2, tmp3;
-Continuation cont;
+Continuation cont, label;
 
 char *continuation_string[] = {
   "PRINT_RESULT", "EV_IF_DECIDE", "EV_IF_CONSEQUENT", "EV_IF_ALTERNATIVE", "EV_ASSIGNMENT_1", "EV_DEFINITION_1",
@@ -140,21 +140,11 @@ Obj concat(Obj l, Obj m) {	// destructive append, sets the cdr of l to m (unless
 }
 
 Obj adjoin_arg(Obj arg, Obj arglist) {
-  //  return concat(arglist, cons(arg, NIL));
   tmp1 = arg; tmp2 = arglist;
   need(2);
   arg = tmp1; arglist = tmp2;
   return concat(arglist, cons(arg, NIL));
-
-
-
-  tmp2 = arglist;
-  tmp1 = cons(arg, NIL);
-  need(1001);
-  return concat(tmp2, tmp1);
 }
-
-Continuation label;
 
 int length(Obj p) {
   int n = 0;
