@@ -9,6 +9,7 @@
   * Catch C-c to stop interpreter and return to REPL
   * call/cc
   * Rewrite makefile
+  * Parser is not GC safe
   * 
  **/
 
