@@ -173,6 +173,88 @@ We _could_ use `000` as the tag for numbers and apply addition, subtraction, etc
 tagged numbers but LISP program typically don't do a lot of number crunching so we
 reserve the tag `000` for pairs instead.
 
+# Garbage collection
+
+This Lisp uses Cheney's Stop-and-Copy algorithm for garbage collection. An alternative would have
+been Mark and Sweep. Both have its pros and cons:
+
+- Stop-and-Copy moves objects (which can be a problem as we'll discuss in a minute) and also
+uses half of the memory to copy used objects into. However, after Stop-and-Copy has run, the
+objects have been compacted together and there's no need to maintain a free list (a linked list
+of free cons cells).  Rather, a free index (where to allocate the next cons cell) is enough.
+Compacting objects also leads to fewer page faults.
+
+- Mark and Sweep, if implemented correctly needs a complicated pointer reversal algorithm to
+run in O(1) space. Also, free cons cells must be kept in a linked list as objects don't move.
+But the fact that object doesn't move is very useful, as we will discuss next.
+
+Debugging garbage collection is a really hard: if there's a bug in the actual garbage collector,
+the memory will be thrashed and there's no journal of what has happened.  And if the stop-and-copy
+garbage collector runs correctly, the rest of the code must take into consideration that any 
+reference to memory will be stale afterwards.  We maintain a so called *root set*, a list of objects
+that we can retrieve afterwards to re-assign important variables.
+
+At the heart of the interpreter is `cons` which creates a cons cell. If `cons` notices that it is
+out of memory, it invokes the garbage collector. So every time we call a function that 
+(transitively) calls `cons`, garbage collection can be triggered. 
+Therefore, code like this is highly dangerous:
+
+```
+void foo(Obj p) {
+  Obj r = cons(...);
+}
+```
+If the call the `cons` triggers garbage collection we can probably say goodbye to `p`!
+Even calling `cons(x,y)` means that you that you can't use `x` and `y` afterwards.
+
+Enter the *root set*.
+
+The root set is a list of global variables which we can recover after garbage collection.
+In our case, `root` is a list 
+`env val unev argl proc expr prim_proc stack cont conscell tmp1 tmp2 tmp3`.
+The first 10 objects in this list belong to the register machine (which is described in SICP).
+The last four, `conscell`, `tmp1`, `tmp2` and `tmp3`, are global variables that we can use
+to safely maintain a reference to an object, if garbage collection is suddenly invoked.
+
+It works like this: before garbage collection starts, the root set is updated with the current
+values of the variables above. The root set is then placed at the beginning (index 1) of the new memory 
+where live objects are later copied into. After garbage collection, when the dust has settled,
+we can retrieve the root set again at index 1 in the new space. 
+
+A word of warning: the variables `tmp1`, `tmp2` and `tmp3` are globals so you can't use them
+in a recursive function.  By now, you should realize that the sudden invocation of the
+stop-and-copy garbage collector makes it a bit tricky to write the interpreter because you
+never know when the rug will be pulled under your feet!  Based on my limited experience
+there are two ways of dealing with this "threat":
+
+- write your interpreter code without recursion and use the `tmp` variables for any references.
+
+- call the function `need(n)` to make sure that `n` cells can be allocated without the garbage
+collector being invoked:
+
+```
+void need(int n) {
+  if (free_index + n >= MEMSIZE)
+    gc();
+  if (free_index + n >= MEMSIZE)
+    error("Out of memory");
+}
+```
+
+And here is the code for `cons`:
+
+```
+Obj cons(Obj car_, Obj cdr_) {
+  thecars[free_index] = car_;
+  thecdrs[free_index] = cdr_;
+  conscell = mkpair(free_index);
+  free_index++;
+  if (free_index >= MEMSIZE)
+    gc();
+  return conscell;
+}
+```
+
 # Future plans
 
 While I'm not aiming to write a fully fledged Scheme interpreter there
