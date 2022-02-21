@@ -25,24 +25,24 @@
 Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, root, stack, conscell, tmp1, tmp2, tmp3;
 Continuation cont, label;
 
-char *continuation_string[] = {
-  "PRINT_RESULT", "EV_IF_DECIDE", "EV_IF_CONSEQUENT", "EV_IF_ALTERNATIVE", "EV_ASSIGNMENT_1", "EV_DEFINITION_1",
-  "EV_APPL_DID_OPERATOR", "EV_APPL_ACCUMULATE_ARG", "EV_APPL_ACCUM_LAST_ARG", "EV_SEQUENCE_CONTINUE",
-  "EVAL_DISPATCH", "EV_SELF_EVAL", "EV_VARIABLE", "EV_QUOTED", "EV_IF", "EV_ASSIGNMENT", "EV_DEFINITION", "EV_LAMBDA",
-  "EV_BEGIN", "EV_APPLICATION", "EV_APPL_OPERAND_LOOP", "EV_APPL_LAST_ARG", "EV_SEQUENCE", "EV_SEQUENCE_LAST_EXP",
-  "APPLY_DISPATCH", "PRIMITIVE_APPLY", "COMPOUND_APPLY", "UNKNOWN_PROCEDURE_TYPE", "UNKNOWN_EXPRESSION_TYPE" };
-
 int verbose = 0;
 char *fname;
 FILE *fp;
 int lineno;
 char *progname;
-
 static jmp_buf jmpbuf;
+
 void error(char *s)   {
   printf("%s on line %d, file %s\n", s, lineno, fname);
   longjmp(jmpbuf, 1);
 }
+
+char *continuation_string[] = { "PRINT_RESULT", "EV_IF_DECIDE", "EV_IF_CONSEQUENT", "EV_IF_ALTERNATIVE",
+  "EV_ASSIGNMENT_1", "EV_DEFINITION_1", "EV_APPL_DID_OPERATOR", "EV_APPL_ACCUMULATE_ARG", "EV_APPL_ACCUM_LAST_ARG",
+  "EV_SEQUENCE_CONTINUE", "EVAL_DISPATCH", "EV_SELF_EVAL", "EV_VARIABLE", "EV_QUOTED", "EV_IF", "EV_ASSIGNMENT",
+  "EV_DEFINITION", "EV_LAMBDA", "EV_BEGIN", "EV_APPLICATION", "EV_APPL_OPERAND_LOOP", "EV_APPL_LAST_ARG",
+  "EV_SEQUENCE", "EV_SEQUENCE_LAST_EXP", "APPLY_DISPATCH", "PRIMITIVE_APPLY", "COMPOUND_APPLY",
+  "UNKNOWN_PROCEDURE_TYPE", "UNKNOWN_EXPRESSION_TYPE" };
 
 int objtype(Obj n) { return n & 7; }
 int objval(Obj n)  {
@@ -58,33 +58,13 @@ void unbound(Obj id) {
 
 Obj mkpair(int p) { return ((p) << 3) | PAIR_TAG; }
 
-// cons and GC:
-// if you call cons(x,y) you must not use x and y afterwards as the objects they pointed to
-// before the call to cons may have been moved as because of a garbage collection.
-// If you need x and y after the call, push them first before the call to cons so that they
-// are part of the stack, then pop them after the cons-call:
-// push(x); push(y); Obj p = cons(x, y); y = pop(); x = pop();
-// Alternatively, use variables tmp1, tmp2 - BUT they are global so you can't use them recursively
-// or if you call another function which uses tmp1, tmp2.
-// A reference to a cons cell is bound to become stale after gc so these
-// references must be held in a root-set variable so that their addresses can be updated after GC.
-// A non-root variable can't hold a memory reference if it is going to call a function which will
-// eventually call cons()
-
-
-// gc, k&r, lisp, pek
-
-
 Obj cons(Obj car_, Obj cdr_) {
   thecars[free_index] = car_;
   thecdrs[free_index] = cdr_;
   conscell = mkpair(free_index);
   free_index++;
-  if (free_index >= MEMSIZE) {
-    // printf("conscell = %d, car = %d, cdr = %d\n", objval(conscell), objval(car_), objval(cdr_));
+  if (free_index >= MEMSIZE)
     gc();
-    // printf("after GC: conscell = %d, car = %d, cdr = %d\n", objval(conscell), objval(car_), objval(cdr_));
-  }
   return conscell;
 }
 
@@ -114,11 +94,9 @@ Obj pop() {
 }
 
 void need(int n) {
-  if (free_index + n +1 >= MEMSIZE) {
-    // printf("need %d ", n);
+  if (free_index + n >= MEMSIZE)
     gc();
-  }
-  if (free_index + n +1 >= MEMSIZE)
+  if (free_index + n >= MEMSIZE)
     error("Out of memory");
 }
 
