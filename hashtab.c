@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include "hashtab.h"
 
-#define HASHTABSIZ 80
+#define HASHTABSIZ 100
 
 struct {
   char *id;
@@ -27,6 +27,7 @@ int lookup(char *name) {
       h = (h+1) % HASHTABSIZ;
   }
   fprintf(stderr, "hashtable is full!\n");
+  dump_hashtab();
   exit(1);
 }
 

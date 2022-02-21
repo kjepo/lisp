@@ -2,7 +2,7 @@
 #define LISPH
 
 #define NL printf("\n");
-#define MEMSIZE 8192
+#define MEMSIZE (2<<14)
 //#define MEMSIZE 105
 #define STACKSIZE 100
 

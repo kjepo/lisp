@@ -113,124 +113,120 @@ Obj pop() {
   }
 }
 
-
-Obj mkproc(Obj parameters, Obj body, Obj env) { // a procedure is a triple (parameters body env) */
-  //  Obj p = cons(parameters, cons(body, cons(env, NIL)));
-  //  return ((objval(p)) << 3) | PROC_TAG;
-  // return cons(PROCEDURE_SYM, cons(parameters, cons(body, cons(env, NIL))));
-  tmp1 = env;
-  tmp2 = body;
-  push(parameters);
-  tmp1 = cons(tmp1, NIL);
-  tmp1 = cons(tmp2, tmp1);
-  tmp2 = pop();
-  tmp1 = cons(tmp2, tmp1);
-  return cons(PROCEDURE_SYM, tmp1);
+void need(int n) {
+  if (free_index + n +1 >= MEMSIZE) {
+    // printf("need %d ", n);
+    gc();
+  }
+  if (free_index + n +1 >= MEMSIZE)
+    error("Out of memory");
 }
 
-// Either we write append so that the gc doesn't remove any references from us,
-// or we make sure that gc isn't invoked during append by checking there is enough
-// space before append runs
+Obj mkproc(Obj parameters, Obj body, Obj env) { // a procedure is a triple (parameters body env)
+  tmp1 = env;  tmp2 = body;  tmp3 = parameters;
+  need(5);
+  parameters = tmp3; body = tmp2; env = tmp1;
+  return cons(PROCEDURE_SYM, cons(parameters, cons(body, cons(env, NIL))));
+}
 
-// append '(1 2 3) '(4 5 6) => (1 2 3 4 5 6)
-// cons(1, cons(2, cons(3, '(4 5 6))))
-
-
-Obj append(Obj l, Obj m) {
+Obj concat(Obj l, Obj m) {	// destructive append, sets the cdr of l to m (unless l is NIL of course)
+  Obj head = l;
   if (l == NIL)
     return m;
-  Obj head = l;
   while (cdr(l) != NIL)
     l = cdr(l);
   cdr(l) = m;
   return head;
 }
 
-
-Obj append2(Obj, Obj);
-Obj appendy(Obj l, Obj m) {
-  printf("append: l = "); display(l); printf(" m = "); display(m);
-  Obj r = append2(l, m);
-  printf(" => "); display(r); NL;
-  return r;
-}
-
-Obj append2(Obj l, Obj m) {
-  // return (l == NIL ? m : cons(car(l), append(cdr(l), m)));  
-  if (l == NIL)
-    return m;
-  tmp1 = car(l);
-  push(tmp1);
-  tmp2 = append2(cdr(l), m);
-  tmp1 = pop();
-  return cons(tmp1, tmp2);
-}
-
-
-Obj appendx(Obj l, Obj m) {
-  return (l == NIL ? m : cons(car(l), append(cdr(l), m)));
-
-  if (l == NIL)
-    return m;
-  push(car(l));
-  Obj t = append2(cdr(l), m);
-  Obj h = pop();
-  return cons(h, t);
-}
-
 Obj adjoin_arg(Obj arg, Obj arglist) {
-  //  return append(arglist, cons(arg, NIL));
-  tmp1 = cons(arg, NIL);	/* should be able to simplify */
-  return append(arglist, tmp1);
+  //  return concat(arglist, cons(arg, NIL));
+  tmp1 = arg; tmp2 = arglist;
+  need(2);
+  arg = tmp1; arglist = tmp2;
+  return concat(arglist, cons(arg, NIL));
+
+
+
+  tmp2 = arglist;
+  tmp1 = cons(arg, NIL);
+  need(1001);
+  return concat(tmp2, tmp1);
 }
 
 Continuation label;
 
-Obj pairup(Obj vars, Obj vals) {
-  //  printf("pairup: vars = "); display(vars); NL;
-  //  printf("pairup: vals = "); display(vals); NL;
+int length(Obj p) {
+  int n = 0;
+  while (p != NIL) {
+    p = cdr(p);
+    n++;
+  }
+  return n;
+}
+
+
+Obj pairup_aux(Obj vars, Obj vals) {
   if (vars == NIL)
     return NIL;
-  tmp1 = car(vars);
-  //  printf("pairup: car vars = "); display(tmp1); NL;
-  tmp2 = car(vals);
-  //  printf("pairup: car vals = "); display(tmp2); NL;  
-  tmp1 = cons(tmp1, tmp2);
-  //  printf("pairup: pushing tmp1 = "); display(tmp1); NL;
-  push(tmp1);
-  tmp2 = pairup(cdr(vars), cdr(vals));
-  tmp1 = pop();
-  //  printf("pairup: popping tmp1 = "); display(tmp1); NL;
-  //  printf("pairup: tmp2 = "); display(tmp2); NL;  
-  tmp2 = cons(tmp1, tmp2);
-  //  printf("pairup: tmp2 = "); display(tmp2); NL;
-  // printf("pairup returns "); display(tmp2); NL;
-  return tmp2;
+  else {
+    return cons(cons(car(vars), car(vals)),
+		pairup_aux(cdr(vars), cdr(vals)));
+  }
 }
+
+Obj pairup(Obj vars, Obj vals) {
+  if (vars == NIL)
+    return NIL;
+  int n = length(vars);
+  int m = length(vals);
+  if (m != n) {
+    display(vars); printf(" "); display(vals); NL;
+    error("Error: length mismatch between parameters and arguments");
+  } else {
+    tmp1 = vars;
+    tmp2 = vals;
+    need(2*n);
+    Obj r = pairup_aux(tmp1, tmp2);
+    return r;
+  }
+}
+
+#define PR(x, xs)    printf("bind: %s =", xs); display(x);
 
 Obj bind(Obj vars, Obj vals, Obj environment) {
   /*
   if (objtype(vars) != PAIR_TAG)                // ((lambda l body) '(1 2 3)) => bind l/'(1 2 3)
-    return append(pairup(cons(vars, NIL), cons(vals, NIL)), environment);
+    return concat(pairup(cons(vars, NIL), cons(vals, NIL)), environment);
   else                                          // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3
-    return append(pairup(vars, vals), environment);
+    return concat(pairup(vars, vals), environment);
   */
-  
+
+  tmp1 = vars; tmp2 = vals; tmp3 = environment;
+  need(1003);
+  environment = tmp3; vals = tmp2; vars = tmp1;
+
+
   if (objtype(vars) != PAIR_TAG) {               // ((lambda l body) '(1 2 3)) => bind l/'(1 2 3)
     tmp3 = environment;
     tmp1 = cons(vars, NIL);
     tmp2 = cons(vals, NIL);
     tmp2 = pairup(tmp1, tmp2);
-    return append(tmp2, tmp3);
+    return concat(tmp2, tmp3);
   } else {                                      // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3
+    //    PR(environment, "environment"); NL; PR(vars, "vars"); NL; PR(vals, "vals"); NL;
     push(environment);
+    //    printf("====after push\n"); PR(environment, "environment"); NL; PR(vars, "vars"); NL; PR(vals, "vals"); NL;
     tmp1 = pairup(vars, vals);   // <--- uses tmp1 and tmp2
+    //    printf("====after pairup\n"); PR(tmp1, "tmp1"); NL;
     environment = pop();
-    return append(tmp1, environment);
+    //    PR(environment, "environment"); NL;
+    return concat(tmp1, environment);
   }
 }
 
 void prepend(Obj x, Obj l) {
+  need(104);
   tmp1 = x;
   tmp2 = l;
   Obj first = car(tmp2);
@@ -242,6 +238,7 @@ void prepend(Obj x, Obj l) {
 
 void add_binding(Obj var, Obj val, Obj env) {
   // tmp1 = cons(var, val);
+  need(105);
   prepend(cons(var, val), env);
   //  prepend(tmp1, env);
 }
@@ -513,12 +510,12 @@ void eval_dispatch() {
       display_registers("COMPOUND_APPLY");
       unev = cadr(proc);      /* procedure parameters */
       env = cadddr(proc);     /* procedure environment */
-      // display_registers("COMPOUND_APPLY [2]");
-      // printf("unev: "); display(unev); NL;
-      // printf("argl: "); display(argl); NL;
-      // printf("env:  "); display(env);  NL;
+      display_registers("COMPOUND_APPLY [2]");
+      //      printf("unev: "); display(unev); NL;
+      //      printf("argl: "); display(argl); NL;
+      //      printf("env:  "); display(env);  NL;
       env = bind(unev, argl, env);   /* bind formals to arguments */
-      // printf("env2:  "); display(env);  NL;
+      //      printf("env2:  "); display(env);  NL;
       // display_registers("COMPOUND_APPLY [3]");
       unev = caddr(proc);     /* procedure body */
       // display_registers("COMPOUND_APPLY [4]");
@@ -573,7 +570,10 @@ void eval_dispatch() {
     case EV_APPL_ACCUM_LAST_ARG:
       display_registers("EV_APPL_ACCUMULATE_LAST_ARG");
       argl = pop();
+      //      PR(argl, "argl"); NL;
+      //      PR(val, "val"); NL;
       argl = adjoin_arg(val, argl);
+      //      PR(argl, "argl"); NL;
       proc = pop();
       label = APPLY_DISPATCH;
       display_registers("EV_APPL_ACCUMULATE_LAST_ARG [2]");
@@ -1006,11 +1006,11 @@ int main(int argc, char *argv[]) {
 
   Obj l1 = cons(mknum(1), cons(mknum(2), cons(mknum(3), NIL)));
   Obj l2 = cons(mknum(101), cons(mknum(102), cons(mknum(103), NIL)));
-  Obj l3 = append(l1, l2);
+  Obj l3 = concat(l1, l2);
   display(l3); NL;
-  l3 = append(l1, NIL);
+  l3 = concat(l1, NIL);
   display(l3); NL;
-  l3 = append(NIL, l2);
+  l3 = concat(NIL, l2);
   display(l3); NL;  
   */
 

@@ -12,8 +12,8 @@ void gc() {
   /*
   printf("\nBefore: expr = "); display(expr); 
   printf(" val = "); display(val); 
-  printf(" argl = "); display(argl);
   printf(" proc = "); display(proc);
+  printf(" argl = "); display(argl);
   printf(" cont = "); display(cont);
   printf(" env = "); display(env);
   printf(" unev = "); display(unev); NL;
@@ -90,11 +90,12 @@ void gc() {
   newcdrs = t;
 
   restore_rootset();
+
   /*
   printf("\nAfter: expr = "); display(expr); 
   printf(" val = "); display(val); 
-  printf(" argl = "); display(argl);
   printf(" proc = "); display(proc);
+  printf(" argl = "); display(argl);
   printf(" cont = "); display(cont);
   printf(" env = "); display(env);
   printf(" unev = "); display(unev); NL;
