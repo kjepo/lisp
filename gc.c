@@ -1,10 +1,7 @@
 #include <stdio.h>
-#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include "lisp.h"
-#include "gc.h"
-#include "print.h"
 
 int alloc;
 
@@ -19,8 +16,8 @@ void mscopy(from) {
 
 int gc() {
   int i, scan;                             // indices into newcars/newcdrs
-  scan = alloc = 1;                        // don't start at 0 (=NIL)
   memset(newcars, 0, MEMSIZE);  memset(newcdrs, 0, MEMSIZE);
+  scan = alloc = 1;                        // don't start at 0 (=NIL)
   ROOTSET(env); ROOTSET(val); ROOTSET(unev); ROOTSET(argl); ROOTSET(proc); ROOTSET(expr); ROOTSET(cont);
   ROOTSET(stack); ROOTSET(conscell); ROOTSET(prim_proc); ROOTSET(tmp1); ROOTSET(tmp2); ROOTSET(tmp3); 
   while (alloc > scan) {
