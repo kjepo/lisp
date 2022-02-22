@@ -66,8 +66,7 @@ Obj cons(Obj car_, Obj cdr_) {
   thecars[free_index] = car_;
   thecdrs[free_index] = cdr_;
   conscell = mkpointer(free_index);
-  free_index++;
-  if (free_index >= MEMSIZE)
+  if (++free_index >= MEMSIZE)
     gc();
   return conscell;
 }
