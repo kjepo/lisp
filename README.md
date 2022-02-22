@@ -217,7 +217,7 @@ If `cons()` notices that it is out of memory, it invokes the garbage collector.
 Obj cons(Obj car_, Obj cdr_) {
   thecars[free_index] = car_;
   thecdrs[free_index] = cdr_;
-  conscell = mkpair(free_index);
+  conscell = mkpointer(free_index);
   if (++free_index >= MEMSIZE)
     gc();
   return conscell;
