@@ -1,6 +1,6 @@
 #ifndef GCH
 #define GCH
 
-void gc();
+int gc();
 
 #endif

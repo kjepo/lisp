@@ -14,13 +14,15 @@ void mscopy(from) {
   alloc++;
 }
 
-void gc() {
-  int i, scan;   // indices into newcars/newcdrs
-  update_rootset();
+#define ROOTSET(x) newcars[alloc++] = x;
+#define ROOTGET(x) x = newcars[alloc++];
+
+int gc() {
+  int i, scan;                             // indices into newcars/newcdrs
   scan = alloc = 1;                        // don't start at 0 (=NIL)
-  memset(newcars, 0, MEMSIZE);
-  memset(newcdrs, 0, MEMSIZE);
-  mscopy(objval(root));
+  memset(newcars, 0, MEMSIZE);  memset(newcdrs, 0, MEMSIZE);
+  ROOTSET(env); ROOTSET(val); ROOTSET(unev); ROOTSET(argl); ROOTSET(proc); ROOTSET(expr); ROOTSET(cont);
+  ROOTSET(stack); ROOTSET(conscell); ROOTSET(prim_proc); ROOTSET(tmp1); ROOTSET(tmp2); ROOTSET(tmp3); 
   while (alloc > scan) {
     Obj p1 = newcars[scan];                // (p1 . p2) is the cons cell at the scan pointer
     if (is_pair(p1)) {                     // first handle p1
@@ -47,14 +49,11 @@ void gc() {
     scan++;                               // finished with (p1 . p2)
   }
   printf("[GC: compressed %d cells down to %d]\n", MEMSIZE, alloc);
-  if (alloc >= MEMSIZE) {
-    fprintf(stderr, "Sorry - memory is full, even after GC\n");
-    exit(1);
-  }
-
   free_index = alloc;
+  alloc = 1;
+  ROOTGET(env); ROOTGET(val); ROOTGET(unev); ROOTGET(argl); ROOTGET(proc); ROOTGET(expr); ROOTGET(cont);
+  ROOTGET(stack); ROOTGET(conscell); ROOTGET(prim_proc); ROOTGET(tmp1); ROOTGET(tmp2); ROOTGET(tmp3); 
   Obj *t = thecars;  thecars = newcars;  newcars = t;
-       t = thecdrs;  thecdrs = newcdrs;  newcdrs = t;
-  restore_rootset();
-  return;
+  t = thecdrs;  thecdrs = newcdrs;  newcdrs = t;
+  return alloc >= MEMSIZE;
 }

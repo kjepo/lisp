@@ -25,11 +25,9 @@ extern int objval(Obj);
 extern int is_pair(Obj);
 extern int is_compound(Obj);
 extern Obj mkpointer(int);
-extern void update_rootset();
-extern void restore_rootset();
 
 Obj *thecars, *thecdrs, *newcars, *newcdrs;
-extern Obj NIL, free_index, True, False, env, val, unev, argl, proc, expr, root, prim_proc, stack, conscell, tmp1, tmp2, tmp3;
+extern Obj NIL, free_index, True, False, env, val, unev, argl, proc, expr, prim_proc, stack, conscell, tmp1, tmp2, tmp3;
 
 extern int verbose;
 

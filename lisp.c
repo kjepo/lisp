@@ -1,4 +1,4 @@
-/**
+ /**
   * Simple explicit-control register-machine Scheme-like interpreter
   * Written in 2022 by Kjell Post (but a dormant project since 1986)
   *
@@ -24,7 +24,7 @@
 #include "hashtab.h"
 #include "gc.h"
 
-Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, root, stack, conscell;
+Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, stack, conscell;
 Obj tmp1, tmp2, tmp3, prim_proc;
 
 Continuation cont, label;
@@ -67,7 +67,10 @@ Obj cons(Obj car_, Obj cdr_) {
   thecdrs[free_index] = cdr_;
   conscell = mkpointer(free_index);
   if (++free_index >= MEMSIZE)
-    gc();
+    if (gc()) {
+      fprintf(stderr, "Sorry - memory is full, even after GC\n");
+      exit(1);
+    }
   return conscell;
 }
 
@@ -227,47 +230,9 @@ void define_variable(Obj var, Obj val, Obj env) {
     add_binding(var, val, env);
 }
 
-void update_rootset() {         // Update root set with current values for registers
-  car(root) = env;
-  car(cdr(root)) = val;
-  car(cdr(cdr(root))) = unev;
-  car(cdr(cdr(cdr(root)))) = argl;
-  car(cdr(cdr(cdr(cdr(root))))) = proc;
-  car(cdr(cdr(cdr(cdr(cdr(root)))))) = expr;
-  car(cdr(cdr(cdr(cdr(cdr(cdr(root))))))) = prim_proc;
-  car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root)))))))) = stack;
-  car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root))))))))) = conscell;
-  car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root)))))))))) = cont;
-  car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root))))))))))) = tmp1;
-  car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root)))))))))))) = tmp2;
-  car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root))))))))))))) = tmp3;
-}
-
-void restore_rootset() {
-  root =      mkpointer(1);
-  env =       car(root);
-  val =       car(cdr(root));
-  unev =      car(cdr(cdr(root)));
-  argl =      car(cdr(cdr(cdr(root))));
-  proc =      car(cdr(cdr(cdr(cdr(root)))));
-  expr =      car(cdr(cdr(cdr(cdr(cdr(root))))));
-  prim_proc = car(cdr(cdr(cdr(cdr(cdr(cdr(root)))))));
-  stack =     car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root))))))));
-  conscell =  car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root)))))))));
-  cont =      car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root))))))))));
-  tmp1 =      car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root)))))))))));
-  tmp2 =      car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root))))))))))));
-  tmp3 =      car(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(cdr(root)))))))))))));
-}  
-
 void init_symbols() {
-  // the root object is a list of all registers which points into memory
-  root = cons(env, cons(val, cons(unev, cons(argl, cons(proc, cons(expr, cons(prim_proc,
-    cons(stack, cons(conscell, cons(cont, cons(tmp1, cons(tmp2, cons(tmp3, NIL)))))))))))));
-
   False = mkbool("#f");
   True = mkbool("#t");
-
   TRUE_SYM = mksym("true");
   IF_SYM = mksym("if");
   EQ_SYM = mksym("eq");
@@ -897,7 +862,6 @@ int main(int argc, char *argv[]) {
   printf("===> ");
   rep();
 
-  //  gc();
   if (verbose) {
     dump_memory();
     printf("env: "); display(env); NL;

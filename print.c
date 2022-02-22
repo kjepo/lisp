@@ -169,8 +169,6 @@ void mkgraph() {
   sprintf(gname, "mem-%d.dot", gnr++);
   FILE *fp = fopen(gname, "w");
 
-  update_rootset();
-
   fprintf(fp, "digraph T {\n");
   fprintf(fp, "page=\"8,11!\";\n");
   fprintf(fp, "ratio=compress;\n");
@@ -181,7 +179,6 @@ void mkgraph() {
   for (i = 0; i < free_index; i++)
     fprintf(fp, "%d [label=\"<car>%s | <cdr>%s\"]\n", i, cellname(thecars[i]), cellname(thecdrs[i]));
 
-  fprintf(fp, "root [style=filled, color=\"blue\", fontcolor=\"white\"];\n");
   fprintf(fp, "env  [style=filled, color=\"cyan\"];\n");
   fprintf(fp, "val  [style=filled, color=\"cyan\"];\n");
   fprintf(fp, "unev [style=filled, color=\"cyan\"];\n");
@@ -204,7 +201,6 @@ void mkgraph() {
       fprintf(fp, "%d:cdr -> %d:car\n", i, objval(thecdrs[i]));
   }
 
-  fprintf(fp, "root -> %d:car\n", objval(root));
   fprintf(fp, "env -> %d:car\n", objval(env));
   fprintf(fp, "val -> %d:car\n", objval(val));
   fprintf(fp, "unev -> %d:car\n", objval(unev));
@@ -226,8 +222,7 @@ int min(int x, int y) { return x < y ? x : y; }
 
 void dump_memory() {
   mkgraph();
-  printf("MEMORY==> root = %d, env = %d, prim_proc = %d free_index = %d\n",
-	 objval(root), objval(env), objval(prim_proc), free_index);
+  printf("MEMORY==> env = %d, prim_proc = %d free_index = %d\n", objval(env), objval(prim_proc), free_index);
   int i, last;
   for (last = MEMSIZE; last >= 0; last--)
     if (thecars[last])
