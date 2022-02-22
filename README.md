@@ -2,6 +2,9 @@
 
 This is an exercise in building a Lisp machine in a series of steps
 so that (ultimately) we _could_ write it in assembler.
+Why? Yes, why do some people go out in the wilderness and survive
+only with the help of a knife when they could sit in comfort at their
+home, eat take-away food and watch TV?
 
 The original code in `explicit.scm` is a register machine implementation
 of a Lisp interpreter written in Scheme.
@@ -15,7 +18,7 @@ by William Byrd, [https://www.youtube.com/watch?v=OyfBQmvr2Hc])
 
 The next step is to write the same code in C (file `lisp.c`).
 The code is not finished yet but a rudimentary interpreter is working
-and can load the library file `lib.scm`.  Here is a another small example:
+and can load the library file `lib.scm`.  Here is a small example:
 
 ```
 ;;; zero? returns #t if x is zero, #f otherwise
@@ -28,7 +31,7 @@ and can load the library file `lib.scm`.  Here is a another small example:
     (+ n -1)))
 
 ;;; recursive factorial function
-;;; this lisp interpreter can compute up to 11!
+;;; this lisp interpreter can store integers up to 11!
 (define fact
   (lambda (n)
     (if (zero? n)
@@ -68,21 +71,21 @@ is generated.
 - `(lambda (p₁ p₂ ... ) body)` evaluates to a procedure which later can be applied to arguments, e.g.,
 
 ```
-    ((lambda (x y) (+ (* x x) (* y y))) 3 4) ⇒ 25
+((lambda (x y) (+ (* x x) (* y y))) 3 4) ⇒ 25
 ```
 
 because `x` and `y` is bound to `3` and `4`, respectively.
 The parameter list is optional, i.e.,
 
 ```
-    (define foo (lambda () (display 'foo!)))
+(define foo (lambda () (display 'foo!)))
 ```
 
 defines a function `foo` which when invoked with `(foo)` outputs `foo!`.
 Also, there is a mechanism to capture a variable number of arguments: with
 
 ```
-    (define list (lambda l l)
+(define list (lambda l l)
 ```
 all the arguments are bound to the formal parameter `l` so that
 `(list 1 2 3) ⇒ (1 2 3)`. Finally, the `body` of a `lambda` expression can be a list
@@ -120,7 +123,7 @@ The interpreter handles _objects_ which can be
 - booleans, i.e., `#t` and `#f`
 - arrays (not yet implemented)
 
-These objects are stored in 32-bit integers, but to separate them we use 3 bits as a tag for the 8 
+These objects are stored in 32-bit integers, but to separate them we use 3 bits as a tag for the
 different kinds of objects. The tag can be stored in the lower 3 bits or in the 3 most significant bits.
 The trade-offs between these are described in the next section but I have opted for storing the 
 tag in the lower 3 bits.
@@ -154,7 +157,7 @@ the 28th bit every time we need the integer value.) So the largest number we can
 can store is -268435456 which is stored as `11110000 00000000 00000000 00000000`.
 
 As it turns out, we still have to consider negative numbers if we store the tag in the least
-significan bits.
+significant bits.
 
 ## Store the tag in the least significant bits
 
@@ -176,27 +179,31 @@ We _could_ use `000` as the tag for numbers and apply addition, subtraction, etc
 tagged numbers but Lisp program typically don't do a lot of number crunching so we
 reserve the tag `000` for pairs instead.
 
+If you read this and have a better idea of tagging pointers, please let me know.
+
+
 # Garbage collection
 
-This Lisp uses Cheney's Stop-and-Copy algorithm for garbage collection. 
+This Lisp uses Cheney's Stop-and-copy algorithm for garbage collection. 
 An alternative would have been Mark-and-sweep.  Let's give a brief overview of
 both algorithms, along with their pros and cons:
 
 - Stop-and-copy divides the available memory into two halves.  When the first half is full,
 reachable objects are moved into the empty second half.  What remains in the first half is
-non-reachable objects which represents old cells that no longer is used.  The first half
+non-reachable objects which represents old cells that no longer are used.  The first half
 is wiped clean, the two halves are swapped and execution continues.
 
 During stop-and-copy garbage collection the reachable objects are placed adjacent 
 to each other in the second half.  Packing objects together leads to fewer page faults,
-but by actually moving the objects, i.e., changin their addresses,  we can get into 
+but by actually moving the objects, i.e., changing their addresses,  we can get into 
 trouble, as we will discuss in a minute.
 
 - Mark-and-sweep, if implemented correctly needs a complicated pointer reversal algorithm to
 run in O(1) space. Also, free cons cells must be kept in a linked list as objects don't move.
 In contrast, with Stop-and-copy, we have a large contiguous free memory area where larger
-objects can be allocatd without fragmentation problems.
-But the fact that objects don't move in Mark-and-sweep is very useful, as we will discuss next.
+objects can be allocated without fragmentation problems.
+But the fact that objects don't move in Mark-and-sweep is very useful and will 
+avoid some of the problems discussed next.
 
 Debugging garbage collection is a really hard: if there's a bug in the actual garbage collector,
 the memory will be thrashed and there's no journal of what happened.  And even if the stop-and-copy
