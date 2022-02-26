@@ -11,7 +11,7 @@
   * call/cc
   * Rewrite makefile
   * Parser is not GC safe
-  * 
+  *
  **/
 
 #include <stdio.h>
@@ -34,6 +34,7 @@ char *fname;
 FILE *fp;
 int lineno;
 char *progname;
+char *input;
 static jmp_buf jmpbuf;
 
 void error(char *s)   {
@@ -51,7 +52,7 @@ char *continuation_string[] = { "PRINT_RESULT", "EV_IF_DECIDE", "EV_IF_CONSEQUEN
 int objtype(Obj n) { return n & 7; }
 int objval(Obj n)  {
   if (objtype(n) == NUM_TAG && (n & 0x80000000)) /* handle negative number */
-      return ((n >> 3) | 0xe0000000); 
+      return ((n >> 3) | 0xe0000000);
   return n >> 3;
 }
 
@@ -485,7 +486,7 @@ void eval() {
 
     case EV_IF:
       display_registers("EV_IF");
-      push(expr);               // save expression for later 
+      push(expr);               // save expression for later
       push(env);
       push(cont);
       cont = mknum(EV_IF_DECIDE);
@@ -518,9 +519,9 @@ void eval() {
 
     case EV_ASSIGNMENT:
       display_registers("EV_ASSIGNMENT");
-      unev = cadr(expr);        // assignment variable 
+      unev = cadr(expr);        // assignment variable
       push(unev);
-      expr = caddr(expr);	// assignment value 
+      expr = caddr(expr);	// assignment value
       push(env);
       push(cont);
       cont = mknum(EV_ASSIGNMENT_1);
@@ -584,6 +585,7 @@ void eval() {
 
     case PRINT_RESULT:
       if (fp == stdin) {
+	printf(";Value: ");
 	display(val); NL;
       }
       return;
@@ -627,66 +629,128 @@ void eval() {
 
 // scanner and parser for LISP-style input
 typedef enum toktype {
-  END, ID, NUM, STR, CR, LPAR = '(', RPAR = ')', DOT = '.', PLUS = '+', MINUS = '-', TICK = '\''
-} Token;
+  END=1, ID, NUM, STR, CR, LPAR = '(', RPAR = ')', DOT = '.', PLUS = '+', MINUS = '-',
+  TICK = '\'' } Token;
 
 Token token;                    // current token
 char id[80];                    // string value when token == ID
 int nval;                       // numeric value when token == NUM
 
-int legal_symbol_start(char ch) { return isalpha(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }   
-int legal_symbol_rest(char ch)  { return isalnum(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }   
+int legal_symbol_start(char ch) { return isalpha(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }
+int legal_symbol_rest(char ch)  { return isalnum(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }
 
-char nextchar() {		// return next non-white space character, skip ; comments until end-of-line
-  char ch;
-  do {                          
-    if (EOF == (ch = fgetc(fp))) 
-      return END;		// EOF
-    if (ch == '\n')
-      lineno++;			// count line numbers
-  } while (isspace(ch));
+void cmd(char *line) {
+  if (0 == strcmp(line, ":quit"))
+    exit(0);
+  else if (0 == strcmp(line, ":help")) {
+    printf(":quit ==> quit (ctrl-D works too)\n");
+    printf(":help ==> this help text\n");
+    printf(":env  ==> print environment\n");
+    printf(":word ==> print word size\n");
+    printf(":mem  ==> show free memory\n");
+    printf(":gc   ==> force garbage colletion\n");
+  } else if (0 == strcmp(line, ":env")) {
+    display(env);
+  } else if (0 == strcmp(line, ":word")) {
+    printf("%lu\n", sizeof(Obj));    
+  } else if (0 == strcmp(line, ":mem")) {
+    printf("%d/%d cells used\n", free_index, MEMSIZE);
+  } else if (0 == strcmp(line, ":gc")) {
+    gc();
+  } else
+    printf("unknown command: %s\n", line);
+}
 
-  if (ch == ';') {		// ; means comment until end-of-line
-    do {
-      ch = fgetc(fp);
-    } while (ch != '\n');
-    lineno++;
-    return nextchar();
+void cr_readline() {
+  char prompt[20];
+  sprintf(prompt, "[%d] ", lineno++);
+  char *p = readline(prompt);
+  if (!p)
+    exit(0);
+  if (p[0] == ':') {
+    cmd(p);
+    return cr_readline();
   }
+  int n = strlen(p);
+  input = malloc(n + 1);
+  strcpy(input, p);
+  free(p);
+  input[n] = '\n';		/* add \n at end of input */
+  input[n+1] = 0;
+}
+
+void ungetchar(char ch) {
+  if (ch)
+    input--;
+}
+
+char nextchar() {
+  while (input == 0 || *input == 0 || *input == ';')
+    cr_readline();	
+  return *input++;
+}
+
+char nextrealchar() {
+  char ch; 
+  do {
+    ch = nextchar();
+  } while (ch == ' ' || ch == '\t');
   return ch;
 }
 
+Token scan2();
 Token scan() {
-  char *p, ch, lastchar;
+  Token t = scan2();
+  return t;
+  switch (t) {
+  case ID:
+    printf("token = ID %s\n", id);
+    break;
+  case NUM:
+    printf("token = NUM %d\n", nval);
+    break;
+  case STR:
+    printf("token = STR %s\n", id);
+    break;
+  case END:
+    printf("token = END\n");
+    break;
+  default:
+    printf("token = %c\n", t);
+    break;
+  }
+  return t;
+}
 
-  ch = nextchar();
-  if (ch == END)
-    return (token = END);
-
-  switch (ch) {                 /* ch is not ";", whitespace or EOF */
+Token scan2() {
+  char *p, ch = nextrealchar(), lastchar;
+  switch (ch) {
+  case '\n':
+    return token = END;
   case '\"':
     p = id;
-    lastchar = ch;  
-    while ((ch = fgetc(fp)) != EOF) {
+    lastchar = ch;
+    while ((ch = nextchar()) != EOF) {
       if (lastchar == '\\') {
-	if (ch == 'a')	  *(p-1) = '\a';
-	if (ch == 'b')	  *(p-1) = '\b';
-	if (ch == 'f')	  *(p-1) = '\f';
-	if (ch == 'n')	  *(p-1) = '\n';
-	if (ch == 'r')	  *(p-1) = '\r';
-	if (ch == 't')	  *(p-1) = '\t';
-	if (ch == 'v')	  *(p-1) = '\v';
-	if (ch == '\'')	  *(p-1) = '\'';
-	if (ch == '\\')	  *(p-1) = '\\';
+        if (ch == 'a')	  *(p-1) = '\a';
+        if (ch == 'b')	  *(p-1) = '\b';
+        if (ch == 'f')	  *(p-1) = '\f';
+        if (ch == 'n')	  *(p-1) = '\n';
+        if (ch == 'r')	  *(p-1) = '\r';
+        if (ch == 't')	  *(p-1) = '\t';
+        if (ch == 'v')	  *(p-1) = '\v';
+        if (ch == '\'')	  *(p-1) = '\'';
+        if (ch == '\\')	  *(p-1) = '\\';
       } else if (ch == '\"') {
-	*p = 0;
-	return (token = STR);
+        *p = 0;
+        return token = STR;
       } else {
-	*p++ = ch;
+        *p++ = ch;
       }
       lastchar = ch;
     }
-    error("Unterminated string.");
+    fprintf(stderr, "Unterminated string.");
+    exit(1);
   case LPAR:
     return token = LPAR;
   case RPAR:
@@ -697,34 +761,37 @@ Token scan() {
     return token = DOT;
   case '0': case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9':
-    ungetc(ch, fp);
-    fscanf(fp, "%d", &nval);
+    p = id;
+    do {
+      *p++ = ch;
+      ch = nextchar();
+    } while (isdigit(ch));
+    *p = 0;
+    ungetchar(ch);
+    sscanf(id, "%d", &nval);
     return token = NUM;
   default:
     if (legal_symbol_start(ch) && ch != ' ') {
-      char cc, *p = id;
+      char cc = 0, *p = id;
       *p++ = ch;
-      while ((ch = fgetc(fp)) && legal_symbol_rest(ch))
+      while ((ch = nextchar()) && legal_symbol_rest(ch))
         *p++ = ch;
-      ungetc(ch, fp);
+      ungetchar(ch);
       *p = 0;
       // a number is an optional + or - followed by at least one or more digits
       // these are numbers: 1, -1, +1, -12 but these are not -, -1x, +, ++
-      cc = 0;
       if (sscanf(id, "%d%c", &nval, &cc) == 1 && cc == 0)
-	return (token = NUM);
-      return (token = ID);
+        return token = NUM;
+      return token = ID;
     } else
-      printf("lexical error at line %d in file %s: %c\n", lineno, fname, ch);
-    break;
+      return scan2();
   }
-  return token = END;
 }
 
 void expect(Token tok, char *msg) {
   if (token == tok)
     scan();
-  else
+ else 
     error(msg);
 }
 
@@ -739,21 +806,27 @@ Obj parse_atom() {
   } else {
     error("expected number or symbol.");
   }
-  scan();
+  //  scan();
   return x;
 }
 
 Obj parse();
 Obj parse_seq() {
-  if (token != RPAR && token != END)
-    return cons(parse(), parse_seq());
-  else
+  if (token == END) {
+    scan();
+    return parse_seq();
+  } else if (token == RPAR) {
     return NIL;
+  } else {
+    Obj x = parse();
+    scan();
+    return cons(x, parse_seq());
+  }
 }
 
-Obj parse() { 
+Obj parse() {
   if (token == END) {
-    return NIL;
+    return -1;
   } else if (token == ID || token == NUM || token == STR) {
     return parse_atom();
   } else if (token == TICK) {
@@ -766,25 +839,25 @@ Obj parse() {
       return NIL;
     } else {
       Obj r = parse_seq();
-      expect(RPAR, "')' expected");
+      //      expect(RPAR, "')' expected");
       return r;
     }
   } else {
     error("expected number, symbol, or '('.");
-    return NIL;			/* never executed */
+    return -1;			/* never executed */
   }
 }
 
-void rep() {
-  lineno = 0;
-  scan();
+void repl() {
   for (;;) {
-    if (!(expr = parse()))
-      return;
+    scan();
+    if (token == END)		/* reached trailing \n */
+      continue;
+    expr = parse();
+    if (expr == -1)
+      continue;
     env = prim_proc;
     eval();
-    if (fp == stdin)
-      printf("===> ");
   }
 }
 
@@ -794,8 +867,11 @@ void slurp(char *f) {
     fprintf(stderr, "%s: could not open %s\n", progname, fname);
     exit(1);
   } else {
+    printf("reading from files is currently not supported, use redirection instead\n");
+    printf("and start with ./lisp -q\n");
+    exit(0);
     printf("reading %s...\n", fname);
-    rep();
+    repl();
     fp = stdin;
   }
 }
@@ -805,15 +881,15 @@ int main(int argc, char *argv[]) {
   progname = argv[0];
   int libloaded = 0;
 
-  // printf("Welcome to Lisp, word size is %d\n", sizeof(Obj));
+  printf("Welcome to Lisp, type \":help\" for help.\n");
 
   thecars = (Obj *)calloc(MEMSIZE, sizeof(Obj));
-  thecdrs = (Obj *)calloc(MEMSIZE, sizeof(Obj));  
+  thecdrs = (Obj *)calloc(MEMSIZE, sizeof(Obj));
   newcars = (Obj *)calloc(MEMSIZE, sizeof(Obj));
-  newcdrs = (Obj *)calloc(MEMSIZE, sizeof(Obj));  
-  
+  newcdrs = (Obj *)calloc(MEMSIZE, sizeof(Obj));
+
   init_symbols();
-  init_env(); 
+  init_env();
 
   fp = stdin;
   fname = "stdin";
@@ -854,13 +930,12 @@ int main(int argc, char *argv[]) {
     slurp("lib.scm");
     libloaded = 1;
   }
-  //  printf("testing readline:\n");  char* input = readline("prompt> ");  printf("%s\n", input);
 
+  lineno = 1;
  repl:
   fp = stdin;
   fname = "stdin";
-  printf("===> ");
-  rep();
+  repl();
 
   if (verbose) {
     dump_memory();

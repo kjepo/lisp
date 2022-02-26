@@ -33,7 +33,7 @@ int gc() {
         newcars[scan] = thecdrs[i];        // use forwarding address
     }
     Obj p2 = newcdrs[scan];
-    if (is_pair(p2)) {                     // p1 processed, now handle p2
+    if (is_pair(p2)) {                     // p1 processed, now handle p2 in the same way
       i = objval(p2);
       if (thecars[i] != BROKEN_TAG) {
         newcdrs[scan] = mkpointer(alloc);
@@ -47,10 +47,10 @@ int gc() {
   }
   printf("[GC: compressed %d cells down to %d]\n", MEMSIZE, alloc);
   free_index = alloc;
-  alloc = 1;
+  alloc = 1;                              // now retrieve the root set at index 1, 2, etc.
   ROOTGET(env); ROOTGET(val); ROOTGET(unev); ROOTGET(argl); ROOTGET(proc); ROOTGET(expr); ROOTGET(cont);
   ROOTGET(stack); ROOTGET(conscell); ROOTGET(prim_proc); ROOTGET(tmp1); ROOTGET(tmp2); ROOTGET(tmp3); 
-  Obj *t = thecars;  thecars = newcars;  newcars = t;
+  Obj *t = thecars;  thecars = newcars;  newcars = t;  // swap thecars/thecdrs with newcars/newcdrs
   t = thecdrs;  thecdrs = newcdrs;  newcdrs = t;
-  return alloc >= MEMSIZE;
+  return alloc >= MEMSIZE;                // return 1 if we're still out of memory
 }
