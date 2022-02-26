@@ -1,18 +1,17 @@
-OUT      = lisp
-CFILES   = $(wildcard *.c)
-OBJFILES = $(CFILES:.c=.o)
+CC	= gcc
+CFLAGS	= -Ireadline
+LDFLAGS = -lreadline
+DEPS	= gc.h hashtab.h print.h lisp.h
+OBJ	= gc.o hashtab.o print.o lisp.o
 
-CC      = gcc
-CFLAGS  = -g -I/opt/homebrew/opt/readline/include/
-LDLIBS  = -lreadline
-#LDFLAGS ="-L/opt/homebrew/opt/readline/lib"
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
 
+lisp: $(OBJ)
+	$(CC) -o $@ $^ $(CFLAGS)
 
-$(OUT): $(OBJFILES)
-
-.PHONY: clean
 clean:
-	rm -f $(OBJFILES) $(OUT) *~ core print.ps
+	rm -f $(OBJ) *~ core print.ps
 
 print:
 	enscript -2Gr -o print.ps *.c

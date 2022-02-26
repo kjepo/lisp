@@ -4,13 +4,11 @@
   *
   * List of things to fix:
   * ======================
-  * Dotted pairs can't be read
-  * One token lookahead prevents friendly REPL, use GNU readline instead
-  * lineno is off - write a nextchar()
   * Catch C-c to stop interpreter and return to REPL
   * call/cc
   * Rewrite makefile
   * Parser is not GC safe
+  * Add tab completion? https://thoughtbot.com/blog/tab-completion-in-gnu-readline
   *
  **/
 
@@ -339,8 +337,8 @@ void prim_nullp()   { val = (car(argl) == NIL ? True : False); }
 void prim_display() { display(car(argl)); }
 void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
 void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
-void prim_exit()    { longjmp(jmpbuf, 1); } /* fixme: maybe call this quit() and let exit do exit(0) ? */
-void prim_file()    { val = cons(mknum(lineno), cons(mkstr(fname), NIL)); }
+void prim_exit()    { longjmp(jmpbuf, 1); } 
+void prim_file()    { val = cons(mknum(lineno-1), cons(mkstr(fname), NIL)); }
 
 void (*primitives[])() = {
   prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq, prim_eqp,
@@ -791,29 +789,38 @@ Token scan2() {
   }
 }
 
+void expect(Token tok, char *msg) {
+  scan();
+  if (token != tok)
+    error(msg);
+}
+
 Obj parse_atom() {
-  Obj x;
   if (token == ID) {
-    x = mksym(id);
+    return mksym(id);
   } else if (token == NUM) {
-    x = mknum(nval);
+    return mknum(nval);
   } else if (token == STR) {
-    x = mkstr(id);
+    return mkstr(id);
   } else {
     error("expected number or symbol.");
+    return -1;			/* unreachable */
   }
-  //  scan();
-  return x;
 }
 
 Obj parse();
 Obj parse_seq() {
-  if (token == END) {
+  if (token == END) {		/* continue parsing past end-of-line */
     scan();
     return parse_seq();
-  } else if (token == RPAR) {
+  } else if (token == RPAR) {	/* end of list */
     return NIL;
-  } else {
+  } else if (token == DOT) {	/* dotted pair, e.g., (1 2 . 3) */
+    scan();
+    Obj x = parse_atom();
+    expect(RPAR, "')' expected");
+    return x;
+  } else {			/* regular list, e.g., (1 2 3) */
     Obj x = parse();
     scan();
     return cons(x, parse_seq());
@@ -872,11 +879,12 @@ void slurp(char *f) {
 }
 
 int main(int argc, char *argv[]) {
-  char *usage = "usage: %s [-h] [-v] [filename ...]\n";
+  char *usage = "usage: %s [-h] [-v] [-q] [filename ...]\n";
   progname = argv[0];
   int libloaded = 0;
 
   printf("Welcome to Lisp, type \":help\" for help.\n");
+  rl_bind_key('\t', rl_complete);
 
   thecars = (Obj *)calloc(MEMSIZE, sizeof(Obj));
   thecdrs = (Obj *)calloc(MEMSIZE, sizeof(Obj));
@@ -899,12 +907,12 @@ int main(int argc, char *argv[]) {
       } else if (argv[i][1] == 'v') {
         verbose = 1;
       } else if (argv[i][1] == 'h') {
-        fprintf(stderr, usage, progname);
-	fprintf(stderr, "\nThis LISP interpreter accepts the following commands:\n\n");
-	fprintf(stderr, "-q    Don't load lib.scm.\n\n");
-	fprintf(stderr, "-h    Prints this help message.\n\n");
-	fprintf(stderr, "-v    Turns on verbose mode which prints machine registers, memory and symbol table.\n\n");
-	fprintf(stderr, "The source for this project is at http://www.github.com/kjepo/lisp\n");
+        printf(usage, progname);
+printf("  _    _           This Lisp interpreter accepts the following commands:\n");
+printf(" | |  (_)____ __     -q  dont' load lib.scm\n");
+printf(" | |__| (_-< '_ \\    -h  prints this help message\n");
+printf(" |____|_/__/ .__/    -v  verbose mode (prints registers, memory, symbols)\n");
+printf("           |_|     The source for this project is at github.com/kjepo/lisp\n");
 	exit(0);
       } else {
         fprintf(stderr, usage, progname);
