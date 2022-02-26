@@ -651,7 +651,7 @@ void cmd(char *line) {
     printf(":mem  ==> show free memory\n");
     printf(":gc   ==> force garbage colletion\n");
   } else if (0 == strcmp(line, ":env")) {
-    display(env);
+    display(env); NL;
   } else if (0 == strcmp(line, ":word")) {
     printf("%lu\n", sizeof(Obj));    
   } else if (0 == strcmp(line, ":mem")) {
