@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <setjmp.h>
 #include <readline/readline.h>
+#include <readline/history.h>
 #include <assert.h>
 #include "lisp.h"
 #include "print.h"
@@ -665,6 +666,7 @@ void cr_readline() {
   char prompt[20];
   sprintf(prompt, "[%d] ", lineno++);
   char *p = readline(prompt);
+  
   if (!p)
     exit(0);
   if (p[0] == ':') {
@@ -677,6 +679,7 @@ void cr_readline() {
   free(p);
   input[n] = '\n';		/* add \n at end of input */
   input[n+1] = 0;
+  add_history(input);  
 }
 
 void ungetchar(char ch) {
@@ -701,7 +704,7 @@ char nextrealchar() {
 Token scan2();
 Token scan() {
   Token t = scan2();
-  return t;
+  return t;			/* remove for debugging */
   switch (t) {
   case ID:
     printf("token = ID %s\n", id);
@@ -788,13 +791,6 @@ Token scan2() {
   }
 }
 
-void expect(Token tok, char *msg) {
-  if (token == tok)
-    scan();
- else 
-    error(msg);
-}
-
 Obj parse_atom() {
   Obj x;
   if (token == ID) {
@@ -839,7 +835,6 @@ Obj parse() {
       return NIL;
     } else {
       Obj r = parse_seq();
-      //      expect(RPAR, "')' expected");
       return r;
     }
   } else {
