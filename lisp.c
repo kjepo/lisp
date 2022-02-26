@@ -1,20 +1,24 @@
  /**
-  * Simple explicit-control register-machine Scheme-like interpreter
-  * Written in 2022 by Kjell Post (but a dormant project since 1986)
+  * A simple explicit-control, garbage-collecting
+  * register-machine Scheme-like Lisp interpreter
+  * written in 2022 by Kjell Post, but based on a
+  * dormant project from a college course in '86.
   *
   * List of things to fix:
   * ======================
-  * Catch C-c to stop interpreter and return to REPL
+  * read input files
   * call/cc
-  * Rewrite makefile
   * Parser is not GC safe
   * Add tab completion? https://thoughtbot.com/blog/tab-completion-in-gnu-readline
+  * (define loop (lambda () (display "x") (loop)))  ; no args doesn't work 
   *
  **/
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <setjmp.h>
+#include <signal.h>
+#include <unistd.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <assert.h>
@@ -38,6 +42,14 @@ static jmp_buf jmpbuf;
 
 void error(char *s)   {
   printf("%s on line %d, file %s\n", s, lineno, fname);
+  longjmp(jmpbuf, 1);
+}
+
+void INThandler(int sig) {
+  char c;
+  signal(sig, SIG_IGN);
+  printf("Interrupt\n");
+  signal(SIGINT, INThandler);
   longjmp(jmpbuf, 1);
 }
 
@@ -674,10 +686,11 @@ void cr_readline() {
   int n = strlen(p);
   input = malloc(n + 1);
   strcpy(input, p);
-  free(p);
+  //  free(p);
+  add_history(p);
   input[n] = '\n';		/* add \n at end of input */
   input[n+1] = 0;
-  add_history(input);  
+  //  add_history(input);  
 }
 
 void ungetchar(char ch) {
@@ -858,6 +871,8 @@ void repl() {
     expr = parse();
     if (expr == -1)
       continue;
+    // printf("expr = "); display(expr); NL;
+    // printf("repl: input = '%s'\n", input);
     env = prim_proc;
     eval();
   }
@@ -879,12 +894,13 @@ void slurp(char *f) {
 }
 
 int main(int argc, char *argv[]) {
-  char *usage = "usage: %s [-h] [-v] [-q] [filename ...]\n";
+  char *usage = "usage: %s [-q] [-h] [-v] [filename ...]\n";
   progname = argv[0];
   int libloaded = 0;
 
+  signal(SIGINT, INThandler);
+
   printf("Welcome to Lisp, type \":help\" for help.\n");
-  rl_bind_key('\t', rl_complete);
 
   thecars = (Obj *)calloc(MEMSIZE, sizeof(Obj));
   thecdrs = (Obj *)calloc(MEMSIZE, sizeof(Obj));
@@ -908,11 +924,11 @@ int main(int argc, char *argv[]) {
         verbose = 1;
       } else if (argv[i][1] == 'h') {
         printf(usage, progname);
-printf("  _    _           This Lisp interpreter accepts the following commands:\n");
-printf(" | |  (_)____ __     -q  dont' load lib.scm\n");
-printf(" | |__| (_-< '_ \\    -h  prints this help message\n");
-printf(" |____|_/__/ .__/    -v  verbose mode (prints registers, memory, symbols)\n");
-printf("           |_|     The source for this project is at github.com/kjepo/lisp\n");
+	printf("  _    _           This Lisp interpreter accepts the following commands:\n");
+	printf(" | |  (_)____ __     -q  dont' load lib.scm\n");
+	printf(" | |__| (_-< '_ \\    -h  prints this help message\n");
+	printf(" |____|_/__/ .__/    -v  verbose mode (prints registers, memory, symbols)\n");
+	printf("           |_|     The source for this project is at github.com/kjepo/lisp\n");
 	exit(0);
       } else {
         fprintf(stderr, usage, progname);

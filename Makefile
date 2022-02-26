@@ -1,5 +1,5 @@
 CC	= gcc
-CFLAGS	= -Ireadline
+CFLAGS	= -g -I/opt/homebrew/opt/readline/include/
 LDFLAGS = -lreadline
 DEPS	= gc.h hashtab.h print.h lisp.h
 OBJ	= gc.o hashtab.o print.o lisp.o
@@ -8,10 +8,10 @@ OBJ	= gc.o hashtab.o print.o lisp.o
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 lisp: $(OBJ)
-	$(CC) -o $@ $^ $(CFLAGS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 clean:
-	rm -f $(OBJ) *~ core print.ps
+	rm -f $(OBJ) lisp *~ core print.ps
 
 print:
 	enscript -2Gr -o print.ps *.c
