@@ -673,10 +673,16 @@ void cmd(char *line) {
 }
 
 void cr_readline() {
-  char prompt[20];
+  char prompt[20], *p;
   sprintf(prompt, "[%d] ", lineno++);
-  char *p = readline(prompt);
-  
+  if (fp != stdin) {
+    input = malloc(512);
+    if (NULL == fgets(input, 512, fp))
+      longjmp(jmpbuf, 1);	/* should just exit repl */
+    return;
+  }
+  lineno++;
+  p = readline(prompt);
   if (!p)
     exit(0);
   if (p[0] == ':') {
@@ -884,11 +890,9 @@ void slurp(char *f) {
     fprintf(stderr, "%s: could not open %s\n", progname, fname);
     exit(1);
   } else {
-    printf("reading from files is currently not supported, use redirection instead\n");
-    printf("and start with ./lisp -q\n");
-    exit(0);
     printf("reading %s...\n", fname);
     repl();
+    fclose(fp);
     fp = stdin;
   }
 }
