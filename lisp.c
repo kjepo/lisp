@@ -675,7 +675,8 @@ void cr_readline() {
   if (fp != stdin) {
     input = malloc(512);
     if (NULL == fgets(input, 512, fp))
-      longjmp(jmpbuf, 1);	/* should just exit repl */
+      input = "(exit)";
+      //      longjmp(jmpbuf, 1);	/* should just exit repl */
     return;
   }
   p = readline(prompt);
@@ -863,13 +864,14 @@ Obj parse() {
 }
 
 void repl() {
+  input = 0;
   for (;;) {
     scan();
+    if (strncmp(input, "exit)", 5) == 0) /* kludge to stop reading from file */
+      return;
     if (token == END)		/* reached trailing \n */
       continue;
     expr = parse();
-    if (expr == -1)
-      continue;
     // printf("expr = "); display(expr); NL;
     // printf("repl: input = '%s'\n", input);
     env = prim_proc;
