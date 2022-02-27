@@ -3,7 +3,6 @@
 
 #define NL printf("\n");
 #define MEMSIZE (2<<12)
-//#define MEMSIZE 105
 #define STACKSIZE 100
 
 // Objects are tagged 32-bit values
@@ -49,10 +48,7 @@ extern Continuation cont;
 
 extern char *continuation_string[];
 
-Obj TRUE_SYM, IF_SYM, EQ_SYM, LET_SYM, ADD_SYM, SUB_SYM, MUL_SYM, DIV_SYM, DEFINE_SYM, CAR_SYM,
-  CDR_SYM, CONS_SYM, ATOM_SYM, QUOTE_SYM, LETREC_SYM, LAMBDA_SYM, SETBANG_SYM, BEGIN_SYM,
-  PROCEDURE_SYM;
+Obj IF_SYM, EQ_SYM, LET_SYM, ADD_SYM, SUB_SYM, MUL_SYM, DIV_SYM, DEFINE_SYM, CAR_SYM, CDR_SYM,
+  CONS_SYM, ATOM_SYM, QUOTE_SYM, LAMBDA_SYM, SETBANG_SYM, BEGIN_SYM, PROCEDURE_SYM;
 
-//Obj Stack[STACKSIZE];
-//int StackPtr;
 #endif

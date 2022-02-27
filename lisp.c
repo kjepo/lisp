@@ -21,7 +21,6 @@
 
 Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, stack, conscell;
 Obj tmp1, tmp2, tmp3, prim_proc;
-
 Continuation cont, label;
 
 int verbose = 0;
@@ -71,17 +70,17 @@ Obj cons(Obj car_, Obj cdr_) {
   thecars[free_index] = car_;
   thecdrs[free_index] = cdr_;
   conscell = mkpointer(free_index);
-  if (++free_index >= MEMSIZE)
-    if (gc()) {
-      fprintf(stderr, "Sorry - memory is full, even after GC\n");
-      exit(1);
-    }
+  if (++free_index >= MEMSIZE && gc()) {
+    fprintf(stderr, "Sorry - memory is full, even after GC\n");
+    exit(1);
+  }
   return conscell;
 }
 
 typedef enum {
-  PRIM_CAR,  PRIM_CDR,  PRIM_CONS,  PRIM_PAIRP,  PRIM_PLUS,  PRIM_MINUS,  PRIM_TIMES,  PRIM_EQ, PRIM_EQP,
-  PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP, PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT, PRIM_FILE } Primitive;
+  PRIM_CAR, PRIM_CDR, PRIM_CONS, PRIM_PAIRP, PRIM_PLUS, PRIM_MINUS, PRIM_TIMES, PRIM_EQ,
+  PRIM_EQP, PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP, PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT,
+  PRIM_FILE } Primitive;
 
 Obj mknum(int n) { return (n << 3) | NUM_TAG; }
 Obj mkstr(char *str) { return ((lookup(str)) << 3) | STR_TAG; }
@@ -89,9 +88,7 @@ Obj mksym(char *id) { return ((lookup(id)) << 3) | SYMBOL_TAG; }
 Obj mkbool(char *id) { return ((lookup(id)) << 3) | BOOL_TAG; }
 Obj mkprim(Primitive p) { return (p << 3) | PRIM_TAG; }
 
-void push(Obj x) {
-  stack = cons(x, stack);
-}
+void push(Obj x) { stack = cons(x, stack); }
 
 Obj pop() {
   if (stack == NIL) {
@@ -236,33 +233,17 @@ void define_variable(Obj var, Obj val, Obj env) {
 }
 
 void init_symbols() {
-  False = mkbool("#f");
-  True = mkbool("#t");
-  TRUE_SYM = mksym("true");
-  IF_SYM = mksym("if");
-  EQ_SYM = mksym("eq");
-  LET_SYM = mksym("let");
-  ADD_SYM = mksym("add");
-  SUB_SYM = mksym("sub");
-  MUL_SYM = mksym("mul");
-  DIV_SYM = mksym("div");
-  CAR_SYM = mksym("car");
-  CDR_SYM = mksym("cdr");
-  CONS_SYM = mksym("cons");
-  ATOM_SYM = mksym("atom");
-  QUOTE_SYM = mksym("quote");
-  LETREC_SYM = mksym("letrec");
-  DEFINE_SYM = mksym("define");
-  LAMBDA_SYM = mksym("lambda");
-  SETBANG_SYM = mksym("set!");
-  BEGIN_SYM = mksym("begin");
-  PROCEDURE_SYM = mksym("procedure");
+  False = mkbool("#f");  True = mkbool("#t");
+
+  IF_SYM = mksym("if");  EQ_SYM = mksym("eq");  LET_SYM = mksym("let");
+  ADD_SYM = mksym("add");  SUB_SYM = mksym("sub");  MUL_SYM = mksym("mul");
+  DIV_SYM = mksym("div");  CAR_SYM = mksym("car");  CDR_SYM = mksym("cdr");
+  CONS_SYM = mksym("cons");  ATOM_SYM = mksym("atom");  QUOTE_SYM = mksym("quote");
+  DEFINE_SYM = mksym("define");  LAMBDA_SYM = mksym("lambda");  SETBANG_SYM = mksym("set!");
+  BEGIN_SYM = mksym("begin");  PROCEDURE_SYM = mksym("procedure");
+
+  val = unev = argl = proc = stack = NIL;
   cont = mknum(EVAL_DISPATCH);
-  val = NIL;
-  unev = NIL;
-  argl = NIL;
-  proc = NIL;
-  stack = NIL;
 }
 
 void init_env() {
@@ -325,8 +306,7 @@ int ensure_numerical(Obj p, char *opname) {
 }
 
 // argl is a list of arguments (a1 a2 a3 .. aN)
-// if the primitive function only takes one argument, it is a1
-// if the primitive function takes two arguments, they are a1 and a2
+// if the primitive function only takes one argument, it is a1; if it's two then it's a1 and a2
 void prim_plus()    { val = mknum(ensure_numerical(car(argl), "plus") + ensure_numerical(cadr(argl), "plus")); }
 void prim_minus()   { val = mknum(ensure_numerical(car(argl), "minus") - ensure_numerical(cadr(argl), "minus")); }
 void prim_times()   { val = mknum(ensure_numerical(car(argl), "times") * ensure_numerical(cadr(argl), "times")); }
@@ -664,11 +644,12 @@ void cmd(char *line) {
 
 void cr_readline() {
   char prompt[20], *p;
+  size_t len;
   sprintf(prompt, "[%d] ", lineno++);
   if (fp != stdin) {
-    input = malloc(512);
-    if (NULL == fgets(input, 512, fp))
-      input = "(exit)";		/* kludge to stop reading from file */
+    input = NULL;
+    if (getline(&input, &len, fp) == -1) // POSIX (but see README for options)
+      input = "(exit)";
     return;
   }
   p = readline(prompt);
@@ -705,31 +686,7 @@ char nextrealchar() {
   return ch;
 }
 
-Token scan2();
 Token scan() {
-  Token t = scan2();
-  return t;			/* remove for debugging */
-  switch (t) {
-  case ID:
-    printf("token = ID %s\n", id);
-    break;
-  case NUM:
-    printf("token = NUM %d\n", nval);
-    break;
-  case STR:
-    printf("token = STR %s\n", id);
-    break;
-  case END:
-    printf("token = END\n");
-    break;
-  default:
-    printf("token = %c\n", t);
-    break;
-  }
-  return t;
-}
-
-Token scan2() {
   char *p, ch = nextrealchar(), lastchar;
   switch (ch) {
   case '\n':
@@ -756,8 +713,7 @@ Token scan2() {
       }
       lastchar = ch;
     }
-    fprintf(stderr, "Unterminated string.");
-    exit(1);
+    error("unterminated string");
   case LPAR:
     return token = LPAR;
   case RPAR:
@@ -791,14 +747,8 @@ Token scan2() {
         return token = NUM;
       return token = ID;
     } else
-      return scan2();
+      return scan();
   }
-}
-
-void expect(Token tok, char *msg) {
-  scan();
-  if (token != tok)
-    error(msg);
 }
 
 Obj parse_atom() {
@@ -824,7 +774,9 @@ Obj parse_seq() {
   } else if (token == DOT) {	/* dotted pair, e.g., (1 2 . 3) */
     scan();
     Obj x = parse_atom();
-    expect(RPAR, "')' expected");
+    scan();
+    if (token != ')')
+      error("')' expected");
     return x;
   } else {			/* regular list, e.g., (1 2 3) */
     Obj x = parse();
@@ -862,8 +814,7 @@ void repl() {
       return;
     if (token == END)		/* reached trailing \n */
       continue;
-    expr = parse();
-    // printf("expr = "); display(expr); NL;
+    expr = parse();	      // printf("expr = "); display(expr); NL;
     env = prim_proc;
     eval();
   }
