@@ -9,7 +9,6 @@
   * call/cc
   * Parser is not GC safe
   * Add tab completion? https://thoughtbot.com/blog/tab-completion-in-gnu-readline
-  *
  **/
 
 #include <stdio.h>
@@ -680,17 +679,16 @@ void cr_readline() {
   p = readline(prompt);
   if (!p)
     exit(0);
+  add_history(p);
   if (p[0] == ':') {
     cmd(p);
     return cr_readline();
   }
   int n = strlen(p);
   input = malloc(n + 1);
-  strcpy(input, p);
-  free(p);
+  strcpy(input, p);		/* memory leak */
   input[n] = '\n';		/* add \n at end of input */
   input[n+1] = 0;
-  add_history(input);  
 }
 
 void ungetchar(char ch) {
@@ -895,8 +893,6 @@ int main(int argc, char *argv[]) {
   progname = argv[0];
   int libloaded = 0;
 
-  signal(SIGINT, INThandler);
-
   printf("Welcome to Lisp, type \":help\" for help.\n");
 
   thecars = (Obj *)calloc(MEMSIZE, sizeof(Obj));
@@ -906,10 +902,9 @@ int main(int argc, char *argv[]) {
 
   init_symbols();
   init_env();
-
   fp = stdin;
   fname = "stdin";
-
+  signal(SIGINT, INThandler);
   if (setjmp(jmpbuf) == 1)
     goto repl;
 
