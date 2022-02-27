@@ -16,9 +16,9 @@ The code is based on SICP, chapter 5 (and forwards).
 Lisp interpreter, please watch "The most beautiful program ever written"
 by William Byrd, [https://www.youtube.com/watch?v=OyfBQmvr2Hc])
 
-The next step is to write the same code in C (file `lisp.c`).
-The code is not finished yet but a rudimentary interpreter is working
-and can load the library file `lib.scm`.  Here is a small example:
+The next step was to write the same code in C (file `lisp.c`).
+The interpreter is now working and can load the library file `lib.scm`.
+Here is a small example:
 
 ```
 ;;; zero? returns #t if x is zero, #f otherwise
@@ -43,9 +43,15 @@ and can load the library file `lib.scm`.  Here is a small example:
 (newline)
 ```
 
+Currently, the interpreter can read and parse Lisp - both from standard input
+(using GNU's readline), or from external files. The register machine can evaluate
+Lisp expressions with proper tail recursion and invoke a stop-and-copy garbage
+collector when it runs out of memory.  The parser and interpreter is only 900 lines
+of code, but some external files handle printing, the symbol table and garbage collection.
+
 The informal description of the language is as follows:
 ```
-expr    : symbol | ( expr* ) | ' expr
+expr    : symbol | ( expr* ) | ( expr+ . expr ) | ' expr
 symbol  : ID | NUMBER | STRING
 ```
 
@@ -107,8 +113,9 @@ functions `car`, `cdr`, `cons`, `pair?`, `+`, `-`, `*`, `<`, `>`, `display`, `li
 
 # Primitives
 
-- The primitive `(file)` returns a list with the current line number and current file name being parsed.
-
+- The primitive `(file)` returns a list with the current line number and current file name 
+being parsed.
+- The primitive `(exit)` returns to the top-level loop.
 
 
 
@@ -277,11 +284,13 @@ void gc_need(int n) {
 While I'm not aiming to write a fully fledged Scheme interpreter there
 are a few things I'd like to do:
 
-- Catch C-c and use GNU's readline library to parse input from stdin.
 - `call/cc`
 - Special forms needed for `and`, `or`, `not`.
 - Macros
 - Add more primitives, for instance `let`, `cond`
+- Parser is not "GC safe".
+- Add tab completion? [https://thoughtbot.com/blog/tab-completion-in-gnu-readline]
+- When out of memory, the interpreter doesn't recover nicely (GC doesn't work).
 
 # References
 
