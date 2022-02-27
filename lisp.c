@@ -6,7 +6,6 @@
   *                                                           |_|     
   * List of things to fix:
   * ======================
-  * read input files
   * call/cc
   * Parser is not GC safe
   * Add tab completion? https://thoughtbot.com/blog/tab-completion-in-gnu-readline
@@ -52,12 +51,13 @@ void INThandler(int sig) {
   longjmp(jmpbuf, 1);
 }
 
-char *continuation_string[] = { "PRINT_RESULT", "EV_IF_DECIDE", "EV_IF_CONSEQUENT", "EV_IF_ALTERNATIVE",
-  "EV_ASSIGNMENT_1", "EV_DEFINITION_1", "EV_APPL_DID_OPERATOR", "EV_APPL_ACCUMULATE_ARG", "EV_APPL_ACCUM_LAST_ARG",
-  "EV_SEQUENCE_CONTINUE", "EVAL_DISPATCH", "EV_SELF_EVAL", "EV_VARIABLE", "EV_QUOTED", "EV_IF", "EV_ASSIGNMENT",
-  "EV_DEFINITION", "EV_LAMBDA", "EV_BEGIN", "EV_APPLICATION", "EV_APPL_OPERAND_LOOP", "EV_APPL_LAST_ARG",
-  "EV_SEQUENCE", "EV_SEQUENCE_LAST_EXP", "APPLY_DISPATCH", "PRIMITIVE_APPLY", "COMPOUND_APPLY",
-  "UNKNOWN_PROCEDURE_TYPE", "UNKNOWN_EXPRESSION_TYPE" };
+char *continuation_string[] = { "PRINT_RESULT", "EV_IF_DECIDE", "EV_IF_CONSEQUENT",
+  "EV_IF_ALTERNATIVE", "EV_ASSIGNMENT_1", "EV_DEFINITION_1", "EV_APPL_DID_OPERATOR",
+  "EV_APPL_ACCUMULATE_ARG", "EV_APPL_ACCUM_LAST_ARG", "EV_SEQUENCE_CONTINUE",
+  "EVAL_DISPATCH", "EV_SELF_EVAL", "EV_VARIABLE", "EV_QUOTED", "EV_IF", "EV_ASSIGNMENT",
+  "EV_DEFINITION", "EV_LAMBDA", "EV_BEGIN", "EV_APPLICATION", "EV_APPL_OPERAND_LOOP",
+  "EV_APPL_LAST_ARG", "EV_SEQUENCE", "EV_SEQUENCE_LAST_EXP", "APPLY_DISPATCH",
+  "PRIMITIVE_APPLY", "COMPOUND_APPLY", "UNKNOWN_PROCEDURE_TYPE", "UNKNOWN_EXPRESSION_TYPE" };
 
 int objtype(Obj n) { return n & 7; }
 int objval(Obj n)  {
@@ -150,7 +150,6 @@ int length(Obj p) {
   }
   return n;
 }
-
 
 Obj pairup_aux(Obj vars, Obj vals) {
   if (vars == NIL)
@@ -675,8 +674,7 @@ void cr_readline() {
   if (fp != stdin) {
     input = malloc(512);
     if (NULL == fgets(input, 512, fp))
-      input = "(exit)";
-      //      longjmp(jmpbuf, 1);	/* should just exit repl */
+      input = "(exit)";		/* kludge to stop reading from file */
     return;
   }
   p = readline(prompt);
@@ -689,11 +687,10 @@ void cr_readline() {
   int n = strlen(p);
   input = malloc(n + 1);
   strcpy(input, p);
-  //  free(p);
-  add_history(p);
+  free(p);
   input[n] = '\n';		/* add \n at end of input */
   input[n+1] = 0;
-  //  add_history(input);  
+  add_history(input);  
 }
 
 void ungetchar(char ch) {
@@ -865,6 +862,7 @@ Obj parse() {
 
 void repl() {
   input = 0;
+  lineno = 1;
   for (;;) {
     scan();
     if (strncmp(input, "exit)", 5) == 0) /* kludge to stop reading from file */
