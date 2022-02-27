@@ -279,6 +279,19 @@ void gc_need(int n) {
 }
 ```
 
+# Reading lines with readline
+
+If you're compiling on a Windows machine, you may have to replace the
+call to getline with the following code:
+
+```
+input = malloc(512);
+if (NULL == fgets(input, 512, fp))
+  input = "(exit)";
+```
+
+
+
 # Future plans
 
 While I'm not aiming to write a fully fledged Scheme interpreter there
