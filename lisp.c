@@ -4,11 +4,6 @@
   * written in 2022 by Kjell Post, but based on a   | |__| (_-< '_ \
   * dormant project from a college course in 1986   |____|_/__/ .__/  
   *                                                           |_|     
-  * List of things to fix:
-  * ======================
-  * call/cc
-  * Parser is not GC safe
-  * Add tab completion? https://thoughtbot.com/blog/tab-completion-in-gnu-readline
  **/
 
 #include <stdio.h>
@@ -686,7 +681,7 @@ void cr_readline() {
   }
   int n = strlen(p);
   input = malloc(n + 1);
-  strcpy(input, p);		/* memory leak */
+  strcpy(input, p);		/* fixme: memory leak */
   input[n] = '\n';		/* add \n at end of input */
   input[n+1] = 0;
 }
@@ -869,7 +864,6 @@ void repl() {
       continue;
     expr = parse();
     // printf("expr = "); display(expr); NL;
-    // printf("repl: input = '%s'\n", input);
     env = prim_proc;
     eval();
   }
@@ -892,7 +886,6 @@ int main(int argc, char *argv[]) {
   char *usage = "usage: %s [-q] [-h] [-v] [filename ...]\n";
   progname = argv[0];
   int libloaded = 0;
-
   printf("Welcome to Lisp, type \":help\" for help.\n");
 
   thecars = (Obj *)calloc(MEMSIZE, sizeof(Obj));
