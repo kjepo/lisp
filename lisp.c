@@ -41,7 +41,7 @@ char *input;
 static jmp_buf jmpbuf;
 
 void error(char *s)   {
-  printf("%s on line %d, file %s\n", s, lineno, fname);
+  printf("%s on line %d, file %s\n", s, (lineno-1), fname);
   longjmp(jmpbuf, 1);
 }
 
@@ -125,7 +125,8 @@ Obj mkproc(Obj parameters, Obj body, Obj env) { // a procedure is a triple (para
   return cons(PROCEDURE_SYM, cons(parameters, cons(body, cons(env, NIL))));
 }
 
-Obj concat(Obj l, Obj m) {	// destructive append, sets the cdr of l to m (unless l is NIL of course)
+// destructive append, sets the cdr of l to m (unless l is NIL of course)
+Obj concat(Obj l, Obj m) {   
   Obj head = l;
   if (l == NIL)
     return m;
@@ -443,11 +444,8 @@ void eval() {
       continue;
 
     case UNKNOWN_PROCEDURE_TYPE:
-      printf("Unknown procedure\n");
-      display(proc);
-      NL;
-      val = NIL;
-      label = objval(cont);
+      display(proc); NL;
+      error("unknown procedure");
       continue;
 
     case EV_SEQUENCE_CONTINUE:
@@ -681,7 +679,6 @@ void cr_readline() {
       longjmp(jmpbuf, 1);	/* should just exit repl */
     return;
   }
-  lineno++;
   p = readline(prompt);
   if (!p)
     exit(0);
@@ -856,13 +853,10 @@ Obj parse() {
     return cons(QUOTE_SYM, cons(parse(), NIL));
   } else if (token == LPAR) {
     scan();
-    if (token == RPAR) {
-      scan();			/* () */
+    if (token == RPAR)
       return NIL;
-    } else {
-      Obj r = parse_seq();
-      return r;
-    }
+    else
+      return parse_seq();
   } else {
     error("expected number, symbol, or '('.");
     return -1;			/* never executed */
@@ -877,7 +871,7 @@ void repl() {
     expr = parse();
     if (expr == -1)
       continue;
-    // printf("expr = "); display(expr); NL;
+    printf("expr = "); display(expr); NL;
     // printf("repl: input = '%s'\n", input);
     env = prim_proc;
     eval();
