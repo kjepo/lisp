@@ -871,7 +871,7 @@ void repl() {
     expr = parse();
     if (expr == -1)
       continue;
-    printf("expr = "); display(expr); NL;
+    // printf("expr = "); display(expr); NL;
     // printf("repl: input = '%s'\n", input);
     env = prim_proc;
     eval();
