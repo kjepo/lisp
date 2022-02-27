@@ -1,16 +1,15 @@
  /**
-  * A simple explicit-control, garbage-collecting
-  * register-machine Scheme-like Lisp interpreter
-  * written in 2022 by Kjell Post, but based on a
-  * dormant project from a college course in '86.
-  *
+  * A simple explicit-control, garbage-collecting    _    _           
+  * register-machine Scheme-like Lisp interpreter   | |  (_)____ __   
+  * written in 2022 by Kjell Post, but based on a   | |__| (_-< '_ \
+  * dormant project from a college course in 1986   |____|_/__/ .__/  
+  *                                                           |_|     
   * List of things to fix:
   * ======================
   * read input files
   * call/cc
   * Parser is not GC safe
   * Add tab completion? https://thoughtbot.com/blog/tab-completion-in-gnu-readline
-  * (define loop (lambda () (display "x") (loop)))  ; no args doesn't work 
   *
  **/
 
