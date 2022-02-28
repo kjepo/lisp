@@ -3,8 +3,8 @@
 This is an exercise in building a Lisp machine in a series of steps
 so that (ultimately) we _could_ write it in assembler.
 Why? Yes, why do some people go out in the wilderness and survive
-only with the help of a knife when they could sit in comfort at their
-home and watch TV?
+only with the help of a knife when they could sit comfortably at home,
+eat junk food and watch TV?
 
 Anyway...
 
