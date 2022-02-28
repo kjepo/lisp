@@ -118,8 +118,13 @@ being parsed.
 - The primitive `(exit)` returns to the top-level loop.
 
 
+# Implementation details
 
-# Tagged pointers
+While writing the interpreter I was faced with several difficulties which
+caused a few days of pondering.  Below I describe a few decisions I had
+to make.
+
+## Tagged pointers
 
 The interpreter handles _objects_ which can be 
 - pairs of objects, i.e., cons cells
@@ -135,7 +140,7 @@ different kinds of objects. The tag can be stored in the lower 3 bits or in the 
 The trade-offs between these are described in the next section but I have opted for storing the 
 tag in the lower 3 bits.
 
-## Store the tag in the most significant bits
+### Store the tag in the most significant bits
 
 ```
 tttbbbbb bbbbbbbb bbbbbbbb bbbbbbbb
@@ -166,7 +171,7 @@ can store is -268435456 which is stored as `11110000 00000000 00000000 00000000`
 As it turns out, we still have to consider negative numbers if we store the tag in the least
 significant bits.
 
-## Store the tag in the least significant bits
+### Store the tag in the least significant bits
 
 ```
 bbbbbbbb bbbbbbbb bbbbbbbb bbbbbttt
@@ -189,7 +194,7 @@ reserve the tag `000` for pairs instead.
 If you read this and have a better idea of tagging pointers, please let me know.
 
 
-# Parsing Lisp
+## Parsing 
 
 Parsing S-expressions is usually part of a computer science undergrad course.
 In theory, a recursive descent parser sounds simple enough but a few 
@@ -216,15 +221,15 @@ additional items on the wish list makes it more difficult:
 
 - Incorporating GNU's readline with line editing, history, completion, etc.
 
-The parser hierarchy is as follows: 
+This Lisp-parser is constructed as follows:
 
 - At the top is a read-eval-print loop which calls `scan()`, `parse()` 
 and `eval()` in an infinite loop. 
 The user can quit with control-D or by typing `:quit`.
 
 - `scan()` reads the next token from input by calling `nextrealchar()`
-and `nextchar()` to get the next character.  (`nextrealchar()` simply
-skips blanks and tabs.)
+and `nextchar()` to get the next character.  `nextrealchar()` is just
+a convenience function for `nextchar()` that skips blanks and tabs.
 
 - `nextchar()` returns the next character in the buffer, but if the buffer
 is empty, or a ';' is encountered, it calls `cr_readline()` to get another
@@ -247,13 +252,38 @@ Also, `cr_readline()` updates the line number counter, prints a prompt,
 and adds the next line to the command history. It also handles interpreter
 commands like `:help`, `:quit`, `:gc`, etc.
 
+- Coming back to `scan`, it returns the next `token` which can be
+end-of-line (`END`), an identifier (`ID`), a number (`NUM`), a string (`STR`), 
+parenthesis (`LPAR` and `RPAR`), a dot (`DOT`), or a quote mark (`TICK`).
+Normally, a scanner wouldn't return end-of-line but as mentioned before we
+need to handle expressions spread over several lines so I found it essential
+to include this token in the grammar.
 
+- The grammar, finally, is
 
+```
+expr : atom 
+     | "'" expr 
+     | "(" ")" 
+     | "(" seq 
 
+seq  : ")" 
+     | "." atom ")"
+     | END seq 
+     | expr seq 
 
+atom : ID 
+     | NUM 
+     | STR 
+```
+The above grammar can easily be turned into a top-down recursive descent parser
+with one token look-ahead.  It doesn't allow certain constructs, for instance
+writing `()` across two lines, or placing the cdr of a dotted pair on the next
+line - these could be accomodated in the grammar at the cost of additional 
+productions but I don't deem them necessary for serious use so I leave that
+as an exercise for the reader :-)
 
-
-# Garbage collection
+## Garbage collection
 
 This Lisp uses Cheney's Stop-and-copy algorithm for garbage collection. 
 An alternative would have been Mark-and-sweep.  Let's give a brief overview of
@@ -343,10 +373,10 @@ void gc_need(int n) {
 }
 ```
 
-# Reading lines with readline
+## Reading lines with readline
 
 If you're compiling on a Windows machine, you may have to replace the
-call to getline with the following code:
+call to the POSIX getline with the following code:
 
 ```
 input = malloc(512);
