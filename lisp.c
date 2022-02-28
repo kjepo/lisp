@@ -800,8 +800,8 @@ void repl() {
   lineno = 1;
   for (;;) {
     scan();
-    if (strncmp(input, "exit)", 5) == 0) /* kludge to stop reading from file */
-      return;
+    if (strncmp(input, "exit)", 5) == 0 && fp != stdin)
+      return;  /* kludge to stop reading from file */
     if (token == END)		/* reached trailing \n */
       continue;
     expr = parse();	      // printf("expr = "); display(expr); NL;
