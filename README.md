@@ -189,6 +189,70 @@ reserve the tag `000` for pairs instead.
 If you read this and have a better idea of tagging pointers, please let me know.
 
 
+# Parsing Lisp
+
+Parsing S-expressions is usually part of a computer science undergrad course.
+In theory, a recursive descent parser sounds simple enough but a few 
+additional items on the wish list makes it more difficult:
+
+- S-expressions spread out of several lines:
+
+```
+[1] (car 
+[2]  '(1 2 3))
+;Value: 1
+```
+
+- Several S-expressions on one line:
+
+```
+[3] 314 #t 'quux (map zero? '(0 1 2)) (cdr '(1 . 2))
+;Value: 314
+;Value: #t
+;Value: quux
+;Value: (#t #f #f)
+;Value: 2
+```
+
+- Incorporating GNU's readline with line editing, history, completion, etc.
+
+The parser hierarchy is as follows: 
+
+- At the top is a read-eval-print loop which calls `scan()`, `parse()` 
+and `eval()` in an infinite loop. 
+The user can quit with control-D or by typing `:quit`.
+
+- `scan()` reads the next token from input by calling `nextrealchar()`
+and `nextchar()` to get the next character.  (`nextrealchar()` simply
+skips blanks and tabs.)
+
+- `nextchar()` returns the next character in the buffer, but if the buffer
+is empty, or a ';' is encountered, it calls `cr_readline()` to get another
+line from input.
+
+- `cr_readline()` calls GNU's readline, if we're reading from standard input,
+or the POSIX readline if we're reading from a file. For GNU's readline
+we append a newline character, otherwise we wouldn't be able to distinguish
+between 
+```
+(car '(1 2
+3))
+```
+and
+```
+(car '(1 23))
+```
+
+Also, `cr_readline()` updates the line number counter, prints a prompt, 
+and adds the next line to the command history. It also handles interpreter
+commands like `:help`, `:quit`, `:gc`, etc.
+
+
+
+
+
+
+
 # Garbage collection
 
 This Lisp uses Cheney's Stop-and-copy algorithm for garbage collection. 
