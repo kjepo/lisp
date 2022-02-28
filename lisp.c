@@ -19,8 +19,8 @@
 #include "hashtab.h"
 #include "gc.h"
 
-Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, stack, conscell;
-Obj tmp1, tmp2, tmp3, prim_proc;
+Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, stack;
+Obj conscell, tmp1, tmp2, tmp3, prim_proc;
 Continuation cont, label;
 
 int verbose = 0;
@@ -44,14 +44,6 @@ void INThandler(int sig) {
   longjmp(jmpbuf, 1);
 }
 
-char *continuation_string[] = { "PRINT_RESULT", "EV_IF_DECIDE", "EV_IF_CONSEQUENT",
-  "EV_IF_ALTERNATIVE", "EV_ASSIGNMENT_1", "EV_DEFINITION_1", "EV_APPL_DID_OPERATOR",
-  "EV_APPL_ACCUMULATE_ARG", "EV_APPL_ACCUM_LAST_ARG", "EV_SEQUENCE_CONTINUE",
-  "EVAL_DISPATCH", "EV_SELF_EVAL", "EV_VARIABLE", "EV_QUOTED", "EV_IF", "EV_ASSIGNMENT",
-  "EV_DEFINITION", "EV_LAMBDA", "EV_BEGIN", "EV_APPLICATION", "EV_APPL_OPERAND_LOOP",
-  "EV_APPL_LAST_ARG", "EV_SEQUENCE", "EV_SEQUENCE_LAST_EXP", "APPLY_DISPATCH",
-  "PRIMITIVE_APPLY", "COMPOUND_APPLY", "UNKNOWN_PROCEDURE_TYPE", "UNKNOWN_EXPRESSION_TYPE" };
-
 int objtype(Obj n) { return n & 7; }
 int objval(Obj n)  {
   if (objtype(n) == NUM_TAG && (n & 0x80000000)) /* handle negative number */
@@ -60,7 +52,8 @@ int objval(Obj n)  {
 }
 
 void unbound(Obj id) {
-  printf("Unbound variable %s at line %d, file %s\n", find(objval(id)), lineno, fname);
+  printf("Unbound variable %s at line %d, file %s\n",
+	 find(objval(id)), lineno, fname);
   longjmp(jmpbuf, 1);
 }
 
@@ -78,9 +71,9 @@ Obj cons(Obj car_, Obj cdr_) {
 }
 
 typedef enum {
-  PRIM_CAR, PRIM_CDR, PRIM_CONS, PRIM_PAIRP, PRIM_PLUS, PRIM_MINUS, PRIM_TIMES, PRIM_EQ,
-  PRIM_EQP, PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP, PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT,
-  PRIM_FILE } Primitive;
+  PRIM_CAR, PRIM_CDR, PRIM_CONS, PRIM_PAIRP, PRIM_PLUS, PRIM_MINUS, PRIM_TIMES,
+  PRIM_DIV, PRIM_EQ, PRIM_EQP, PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP,
+  PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT, PRIM_FILE } Primitive;
 
 Obj mknum(int n) { return (n << 3) | NUM_TAG; }
 Obj mkstr(char *str) { return ((lookup(str)) << 3) | STR_TAG; }
@@ -108,7 +101,8 @@ void gc_need(int n) {
     error("Out of memory");
 }
 
-Obj mkproc(Obj parameters, Obj body, Obj env) { // a procedure is a triple (parameters body env)
+// a procedure is a triple (parameters body env)
+Obj mkproc(Obj parameters, Obj body, Obj env) { 
   tmp1 = env;  tmp2 = body;  tmp3 = parameters;
   gc_need(5);
   parameters = tmp3; body = tmp2; env = tmp1;
@@ -167,15 +161,15 @@ Obj pairup(Obj vars, Obj vals) {
 }
 
 Obj bind(Obj vars, Obj vals, Obj environment) {
-  if (objtype(vars) != PAIR_TAG) {   // ((lambda l body) '(1 2 3)) => bind l/'(1 2 3)
+  if (objtype(vars) != PAIR_TAG) { // ((lambda l body) '(1 2 3)) => l/'(1 2 3)
     tmp3 = environment;
     tmp1 = cons(vars, NIL);
     tmp2 = cons(vals, NIL);
     tmp2 = pairup(tmp1, tmp2);
     return concat(tmp2, tmp3);
-  } else {                           // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3
+  } else {   // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3
     tmp3 = environment;
-    tmp1 = pairup(vars, vals);       // <--- uses tmp1 and tmp2
+    tmp1 = pairup(vars, vals);	// <--- uses tmp1 and tmp2
     environment = tmp3;
     return concat(tmp1, environment);
   }
@@ -197,7 +191,7 @@ void add_binding(Obj var, Obj val, Obj env) {
   prepend(tmp2, tmp1);
 }
 
-// find the first pair in env whose car equals var and return that pair (or NIL, if not found)
+// find the first pair in env whose car equals var and return that pair
 Obj assoc(Obj var, Obj env) {
   if (env == NIL)
     return NIL;
@@ -235,20 +229,20 @@ void define_variable(Obj var, Obj val, Obj env) {
 void init_symbols() {
   False = mkbool("#f");  True = mkbool("#t");
 
-  IF_SYM = mksym("if");  EQ_SYM = mksym("eq");  LET_SYM = mksym("let");
-  ADD_SYM = mksym("add");  SUB_SYM = mksym("sub");  MUL_SYM = mksym("mul");
-  DIV_SYM = mksym("div");  CAR_SYM = mksym("car");  CDR_SYM = mksym("cdr");
-  CONS_SYM = mksym("cons");  ATOM_SYM = mksym("atom");  QUOTE_SYM = mksym("quote");
-  DEFINE_SYM = mksym("define");  LAMBDA_SYM = mksym("lambda");  SETBANG_SYM = mksym("set!");
-  BEGIN_SYM = mksym("begin");  PROCEDURE_SYM = mksym("procedure");
+  IF_SYM = mksym("if");  EQ_SYM = mksym("eq");  ADD_SYM = mksym("add");
+  SUB_SYM = mksym("sub");  MUL_SYM = mksym("mul");  DIV_SYM = mksym("div");
+  CAR_SYM = mksym("car");  CDR_SYM = mksym("cdr");  CONS_SYM = mksym("cons");
+  QUOTE_SYM = mksym("quote"); DEFINE_SYM = mksym("define");
+  LAMBDA_SYM = mksym("lambda"); SETBANG_SYM = mksym("set!");
+  BEGIN_SYM = mksym("begin"); PROCEDURE_SYM = mksym("procedure");
 
   val = unev = argl = proc = stack = NIL;
   cont = mknum(EVAL_DISPATCH);
 }
 
 void init_env() {
-  // an environment BINDING id -> value is represented simply as cons(id, value)
-  // an ENVIRONMENT is a list of bindings ( ( id . value ) ( id . value ) .... )
+  // an environment BINDING id -> value is represented as cons(id, value)
+  // an ENVIRONMENT is a list of bindings ( ( id . value ) ( id . value ) ... )
   prim_proc = cons(NIL, NIL);  // can't be NIL (make space for 1 binding)
   add_binding(mksym("cons"), mkprim(PRIM_CONS), prim_proc);
   add_binding(mksym("display"), mkprim(PRIM_DISPLAY), prim_proc);
@@ -260,6 +254,7 @@ void init_env() {
   add_binding(mksym("plus"), mkprim(PRIM_PLUS), prim_proc);
   add_binding(mksym("minus"), mkprim(PRIM_MINUS), prim_proc);
   add_binding(mksym("times"), mkprim(PRIM_TIMES), prim_proc);
+  add_binding(mksym("div"), mkprim(PRIM_DIV), prim_proc);
   add_binding(mksym("=="), mkprim(PRIM_EQ), prim_proc);  // ??
   add_binding(mksym("eq?"), mkprim(PRIM_EQP), prim_proc);
   add_binding(mksym("<"), mkprim(PRIM_LT), prim_proc);
@@ -279,7 +274,8 @@ int is_primitive(Obj p)  { return PRIM_TAG == objtype(p); }
 int is_compound(Obj p)   { return is_pair(p) && PROCEDURE_SYM == car(p); }
 int is_nil(Obj p)        { return p == NIL; }
 int is_pair(Obj p)       { return PAIR_TAG == objtype(p) && !is_nil(p); }
-int is_self_evaluating() { return is_nil(expr) || is_num(expr) || is_str(expr) || is_bool(expr); }
+int is_self_evaluating() {
+  return is_nil(expr) || is_num(expr) || is_str(expr) || is_bool(expr); }
 int is_quote()           { return is_pair(expr) && QUOTE_SYM == car(expr); }
 int is_if()              { return is_pair(expr) && IF_SYM == car(expr); }
 int is_assignment()      { return is_pair(expr) && SETBANG_SYM == car(expr); }
@@ -310,6 +306,7 @@ int ensure_numerical(Obj p, char *opname) {
 void prim_plus()    { val = mknum(ensure_numerical(car(argl), "plus") + ensure_numerical(cadr(argl), "plus")); }
 void prim_minus()   { val = mknum(ensure_numerical(car(argl), "minus") - ensure_numerical(cadr(argl), "minus")); }
 void prim_times()   { val = mknum(ensure_numerical(car(argl), "times") * ensure_numerical(cadr(argl), "times")); }
+void prim_div()   { val = mknum(ensure_numerical(car(argl), "times") / ensure_numerical(cadr(argl), "div")); }
 void prim_eq()      { val = ensure_numerical(car(argl), "=") == ensure_numerical(cadr(argl), "=") ? True : False; }
 void prim_lt()      { val = ensure_numerical(car(argl), "<") < ensure_numerical(cadr(argl), "<") ? True : False; }
 void prim_gt()      { val = ensure_numerical(car(argl), ">") > ensure_numerical(cadr(argl), ">") ? True : False; }
@@ -326,8 +323,9 @@ void prim_exit()    { longjmp(jmpbuf, 1); }
 void prim_file()    { val = cons(mknum(lineno-1), cons(mkstr(fname), NIL)); }
 
 void (*primitives[])() = {
-  prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times, prim_eq, prim_eqp,
-  prim_lt, prim_gt, prim_display, prim_numberp, prim_symbolp, prim_nullp, prim_exit, prim_file };
+  prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times,
+  prim_div, prim_eq, prim_eqp, prim_lt, prim_gt, prim_display, prim_numberp,
+  prim_symbolp, prim_nullp, prim_exit, prim_file };
 
 void eval() {
   label = EVAL_DISPATCH;
@@ -628,7 +626,7 @@ void cmd(char *line) {
     printf(":env  ==> print environment\n");
     printf(":word ==> print word size\n");
     printf(":mem  ==> show free memory\n");
-    printf(":gc   ==> force garbage colletion\n");
+    printf(":gc   ==> force garbage collection\n");
   } else if (0 == strcmp(line, ":env")) {
     display(env); NL;
   } else if (0 == strcmp(line, ":word")) {
@@ -664,11 +662,6 @@ void cr_readline() {
   strcpy(input, p);		/* fixme: memory leak */
   input[n] = '\n';		/* add \n at end of input */
   input[n+1] = 0;
-}
-
-void ungetchar(char ch) {
-  if (ch)
-    input--;
 }
 
 char nextchar() {
@@ -729,7 +722,7 @@ Token scan() {
       ch = nextchar();
     } while (isdigit(ch));
     *p = 0;
-    ungetchar(ch);
+    input--;
     sscanf(id, "%d", &nval);
     return token = NUM;
   default:
@@ -738,7 +731,7 @@ Token scan() {
       *p++ = ch;
       while ((ch = nextchar()) && legal_symbol_rest(ch))
         *p++ = ch;
-      ungetchar(ch);
+      input--;
       *p = 0;
       // a number is an optional + or - followed by at least one or more digits
       // these are numbers: 1, -1, +1, -12 but these are not -, -1x, +, ++

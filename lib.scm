@@ -93,7 +93,8 @@
   (lambda l
     (foldl plus l 0)))
 
-;;; I'm adapting MIT-Scheme's behaviour here: (-) => error, (- 3) => -3, (- 10 1) => 9, (- 10 1 2) => 7
+;;; I'm adapting MIT-Scheme's behaviour here: (-) => error
+;;; (- 3) => -3, (- 10 1) => 9, (- 10 1 2) => 7
 
 (define -
   (lambda l
@@ -114,6 +115,17 @@
 (define *
   (lambda l
     (foldl times l 1)))
+
+;;; / is pretty much like minus 
+(define /
+  (lambda l
+    (if (eq? (length l) 0)
+        (begin
+          (display "error: / requires at least one argument\n")
+          (exit))
+        (if (eq? (length l) 1)
+            (div 1 (car l))
+            (div (car l) (foldl times (cdr l) 1))))))
 
 (define and
   (lambda l
