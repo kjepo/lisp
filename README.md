@@ -4,12 +4,15 @@ This is an exercise in building a Lisp machine in a series of steps
 so that (ultimately) we _could_ write it in assembler.
 Why? Yes, why do some people go out in the wilderness and survive
 only with the help of a knife when they could sit in comfort at their
-home, eat take-away food and watch TV?
+hom and watch TV?
+
+Anyway...
 
 The original code in `explicit.scm` is a register machine implementation
 of a Lisp interpreter written in Scheme.
 Rather than the usual recursive apply/eval description of the interpreter,
-we have made the control and arguments explicit.
+we have made the control and arguments explicit so that we don't depend
+on the host language for recursion etc.
 The code is based on SICP, chapter 5 (and forwards).
 
 (If you are not familiar with the traditional eval/apply rendition of a
@@ -17,7 +20,7 @@ Lisp interpreter, please watch "The most beautiful program ever written"
 by William Byrd, [https://www.youtube.com/watch?v=OyfBQmvr2Hc])
 
 The next step was to write the same code in C (file `lisp.c`).
-The interpreter is now working and can load the library file `lib.scm`.
+The interpreter is now working and can load the library file `lib.scm`
 Here is a small example:
 
 ```
@@ -42,6 +45,9 @@ Here is a small example:
 (display (fact 11))
 (newline)
 ```
+
+A larger example can be found in the file `differentiate.scm`: just type
+`./lisp differentiate.scm` to run it.
 
 Currently, the interpreter can read and parse Lisp - both from standard input
 (using GNU's readline), or from external files. The register machine can evaluate
@@ -285,7 +291,7 @@ as an exercise for the reader :-)
 
 ## Garbage collection
 
-This Lisp uses Cheney's Stop-and-copy algorithm for garbage collection. 
+This Lisp uses Cheney's Stop-and-copy algorithm for garbage collection (file `gc.c`).
 An alternative would have been Mark-and-sweep.  Let's give a brief overview of
 both algorithms, along with their pros and cons:
 
@@ -338,20 +344,20 @@ Even calling `cons(x,y)` means that you that you can't use `x` and `y` afterward
 
 Enter the *root set*.
 
-The root set is a list of global variables which we can find after garbage collection.
+The root set is a set of global variables which we can find after garbage collection.
 The stop-and-copy algorithms works by first placing the root set in the empty half.
 It then follows all references from the root set, copying reachable objects into the empty half.
 
-In our case, the root set is a list
+In our case, the root set is 
 `env val unev argl proc expr prim_proc stack cont conscell tmp1 tmp2 tmp3`.
 The first 10 objects in this list belong to the register machine (which is described in SICP).
 The last four, `conscell`, `tmp1`, `tmp2` and `tmp3`, are global variables that we can use
 to safely maintain a reference to an object, if garbage collection is suddenly invoked.
 
-In detail, before garbage collection starts, the root set is updated with the current
-values of the variables above. The root set is then placed at the beginning (index 1) of the new memory 
-where live objects are later copied into. After garbage collection, when the dust has settled,
-we can retrieve the root set again at index 1 in the new space. 
+In detail, before garbage collection starts, the root set is placed at the beginning 
+(index 1) of the new memory where live objects are later copied into. 
+After garbage collection, when the dust has settled,
+we can retrieve the root set variables again at index 1 in the new space. 
 
 A word of warning: the variables `tmp1`, `tmp2` and `tmp3` are globals so you can't use them
 in a recursive function.  By now, you should realize that the sudden invocation of the
