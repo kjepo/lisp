@@ -610,8 +610,7 @@ void eval() {
 
 // scanner and parser for LISP-style input
 typedef enum toktype {
-  END=1, ID, NUM, STR, CR, LPAR = '(', RPAR = ')', DOT = '.', PLUS = '+', MINUS = '-',
-  TICK = '\'' } Token;
+  END=1, ID, NUM, STR, LPAR = '(', RPAR = ')', DOT = '.', TICK = '\'' } Token;
 
 Token token;                    // current token
 char id[80];                    // string value when token == ID
@@ -786,9 +785,7 @@ Obj parse_seq() {
 }
 
 Obj parse() {
-  if (token == END) {
-    return -1;
-  } else if (token == ID || token == NUM || token == STR) {
+  if (token == ID || token == NUM || token == STR) {
     return parse_atom();
   } else if (token == TICK) {
     scan();
