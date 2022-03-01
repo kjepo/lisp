@@ -409,4 +409,9 @@ are a few things I'd like to do:
 
 Abelson and Sussman *Structure and Interpretation of Computer Programs*:
 <br>
-https://mitpress.mit.edu/sites/default/files/sicp/index.html
+[https://mitpress.mit.edu/sites/default/files/sicp/index.html]
+
+[https://www.nhplace.com/kent/Papers/Special-Forms.html]
+
+[https://stackoverflow.com/questions/3465868/how-to-implement-a-lisp-macro-system]
+
