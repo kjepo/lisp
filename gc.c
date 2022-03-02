@@ -45,7 +45,7 @@ int gc() {
     }
     scan++;                               // finished with (p1 . p2)
   }
-  printf("[GC: compressed %d/%d cells down to %d/%d]\n", free_index, MEMSIZE, alloc, MEMSIZE);
+  //  printf("[GC: compressed %d/%d cells down to %d/%d]\n", free_index, MEMSIZE, alloc, MEMSIZE);
   free_index = alloc;
   alloc = 1;                              // now retrieve the root set at index 1, 2, etc.
   ROOTGET(env); ROOTGET(val); ROOTGET(unev); ROOTGET(argl); ROOTGET(proc); ROOTGET(expr); ROOTGET(cont);

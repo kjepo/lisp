@@ -2,7 +2,7 @@
 #define LISPH
 
 #define NL printf("\n");
-#define MEMSIZE (2<<12)
+#define MEMSIZE (2<<25)
 #define STACKSIZE 100
 
 // Objects are tagged 32-bit values

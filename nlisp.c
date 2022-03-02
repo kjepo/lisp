@@ -109,6 +109,14 @@ Obj mkproc(Obj parameters, Obj body, Obj env) {
   return cons(PROCEDURE_SYM, cons(parameters, cons(body, cons(env, NIL))));
 }
 
+Obj mknproc(Obj parameters, Obj body, Obj env) { 
+  tmp1 = env;  tmp2 = body;  tmp3 = parameters;
+  gc_need(5);
+  parameters = tmp3; body = tmp2; env = tmp1;
+  return cons(NPROCEDURE_SYM, cons(parameters, cons(body, cons(env, NIL))));
+}
+
+
 // destructive append, sets the cdr of l to m (unless l is NIL of course)
 Obj concat(Obj l, Obj m) {   
   Obj head = l;
@@ -235,6 +243,8 @@ void init_symbols() {
   QUOTE_SYM = mksym("quote"); DEFINE_SYM = mksym("define");
   LAMBDA_SYM = mksym("lambda"); SETBANG_SYM = mksym("set!");
   BEGIN_SYM = mksym("begin"); PROCEDURE_SYM = mksym("procedure");
+  NLAMBDA_SYM = mksym("nlambda"); NPROCEDURE_SYM = mksym("nprocedure");
+
   val = unev = argl = proc = stack = NIL;
   cont = mknum(EVAL_DISPATCH);
 }
@@ -271,6 +281,7 @@ int is_bool(Obj p)       { return BOOL_TAG == objtype(p); }
 int is_variable()        { return SYMBOL_TAG == objtype(expr); }
 int is_primitive(Obj p)  { return PRIM_TAG == objtype(p); }
 int is_compound(Obj p)   { return is_pair(p) && PROCEDURE_SYM == car(p); }
+int is_ncompound(Obj p)  { return is_pair(p) && NPROCEDURE_SYM == car(p); }
 int is_nil(Obj p)        { return p == NIL; }
 int is_pair(Obj p)       { return PAIR_TAG == objtype(p) && !is_nil(p); }
 int is_self_evaluating() {
@@ -280,6 +291,7 @@ int is_if()              { return is_pair(expr) && IF_SYM == car(expr); }
 int is_assignment()      { return is_pair(expr) && SETBANG_SYM == car(expr); }
 int is_definition()      { return is_pair(expr) && DEFINE_SYM == car(expr); }
 int is_lambda()          { return is_pair(expr) && LAMBDA_SYM == car(expr); }
+int is_nlambda()         { return is_pair(expr) && NLAMBDA_SYM == car(expr); }
 int is_begin()           { return is_pair(expr) && BEGIN_SYM == car(expr); }
 int is_application()     { return is_pair(expr); }
 
@@ -371,6 +383,8 @@ void eval() {
         label = PRIMITIVE_APPLY;
       else if (is_compound(proc))
         label = COMPOUND_APPLY;
+      else if (is_ncompound(proc))
+        label = NCOMPOUND_APPLY;
       else
         label = UNKNOWN_PROCEDURE_TYPE;
       continue;
@@ -387,10 +401,14 @@ void eval() {
       display_registers("COMPOUND_APPLY");
       unev = cadr(proc);      /* procedure parameters */
       env = cadddr(proc);     /* procedure environment */
+      display_registers("COMPOUND_APPLY [2]");
       env = bind(unev, argl, env);   /* bind formals to arguments */
       unev = caddr(proc);     /* procedure body */
       label = EV_SEQUENCE;
       continue;
+
+
+
 
     case EV_SEQUENCE:
       display_registers("EV_SEQUENCE");
@@ -534,6 +552,15 @@ void eval() {
       label = objval(cont);
       continue;
 
+    case EV_NLAMBDA:
+      display_registers("EV_LAMBDA");
+      display_registers("EV_LAMBDA");
+      unev = cadr(expr);        /* parameters */
+      expr = cddr(expr);        /* body */
+      val = mknproc(unev, expr, env);
+      label = objval(cont);
+      continue;
+
     case EV_LAMBDA:
       display_registers("EV_LAMBDA");
       unev = cadr(expr);        /* parameters */
@@ -589,6 +616,8 @@ void eval() {
         label = EV_DEFINITION;
       } else if (is_lambda()) {
         label = EV_LAMBDA;
+      } else if (is_nlambda()) {
+        label = EV_NLAMBDA;
       } else if (is_begin()) {
         label = EV_BEGIN;
       } else if (is_application()) {

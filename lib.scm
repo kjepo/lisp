@@ -78,6 +78,8 @@
 (define cddr  (lambda (l) (cdr (cdr l))))
 (define cdddr (lambda (l) (cdr (cdr (cdr l)))))
 (define caddr (lambda (l) (car (cdr (cdr l)))))
+(define caadr (lambda (l) (car (car (cdr l)))))
+(define cadar (lambda (l) (car (cdr (car l)))))
 (define first (lambda (l) (car l)))
 (define rest  (lambda (l) (cdr l)))
 
