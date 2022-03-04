@@ -122,7 +122,9 @@ functions `car`, `cdr`, `cons`, `pair?`, `+`, `-`, `*`, `<`, `>`, `display`, `li
 - The primitive `(file)` returns a list with the current line number and current file name 
 being parsed.
 - The primitive `(exit)` returns to the top-level loop.
-
+- The variable `current-environment` contains the current environment.
+- The primitive `(eval expr env)` evaluates `expr` in the environment `env`, for instance
+`(eval '(plus 1 2) current-environment)` ⇒ 3.
 
 # Implementation details
 
@@ -197,7 +199,7 @@ We _could_ use `000` as the tag for numbers and apply addition, subtraction, etc
 tagged numbers but Lisp program typically don't do a lot of number crunching so we
 reserve the tag `000` for pairs instead.
 
-If you read this and have a better idea of tagging pointers, please let me know.
+For more on tagged pointers, see "NaN boxing" in the references.
 
 
 ## Parsing 
@@ -404,6 +406,9 @@ are a few things I'd like to do:
 - Parser is not "GC safe".
 - Add tab completion? [https://thoughtbot.com/blog/tab-completion-in-gnu-readline]
 - When out of memory, the interpreter doesn't recover nicely (GC doesn't work).
+- There's a bug when an error is reported: the line number shown is from the expression that initiated the call, and not the actual line where the error occurred.
+- Parse command line arguments in a more conventional way so we don't have to write `lisp -h -q` but rather `lisp -hq`.
+
 
 # References
 
@@ -415,3 +420,4 @@ Abelson and Sussman *Structure and Interpretation of Computer Programs*:
 
 [https://stackoverflow.com/questions/3465868/how-to-implement-a-lisp-macro-system]
 
+[https://piotrduperas.com/posts/nan-boxing]
