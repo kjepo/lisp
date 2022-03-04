@@ -276,8 +276,7 @@ int is_primitive(Obj p)  { return PRIM_TAG == objtype(p); }
 int is_compound(Obj p)   { return is_pair(p) && PROCEDURE_SYM == car(p); }
 int is_nil(Obj p)        { return p == NIL; }
 int is_pair(Obj p)       { return PAIR_TAG == objtype(p) && !is_nil(p); }
-int is_self_evaluating() {
-  return is_nil(expr) || is_num(expr) || is_str(expr) || is_bool(expr); }
+int is_self_evaluating() { return is_nil(expr) || is_num(expr) || is_str(expr) || is_bool(expr); }
 int is_quote()           { return is_pair(expr) && QUOTE_SYM == car(expr); }
 int is_if()              { return is_pair(expr) && IF_SYM == car(expr); }
 int is_assignment()      { return is_pair(expr) && SETBANG_SYM == car(expr); }
@@ -400,9 +399,7 @@ void eval() {			// evaluate expr in env
       unev = cadr(proc);      /* procedure parameters */
       env = cadddr(proc);     /* procedure environment */
       env = bind(unev, argl, env);   /* bind formals to arguments */
-      //      printf("COMPOUND_APPLY II: env = "); display(env); NL;
       unev = caddr(proc);     /* procedure body */
-      //      printf("COMPOUND_APPLY II: unev = "); display(unev); NL;
       label = EV_SEQUENCE;
       continue;
 
