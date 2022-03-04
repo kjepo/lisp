@@ -1,3 +1,5 @@
+(define nil '())
+
 (define newline
   (lambda ()
     (display "\n")))

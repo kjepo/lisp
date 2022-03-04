@@ -316,7 +316,7 @@ void prim_cdr() { checklist(car(argl), "cdr"); val = cdr(car(argl)); }
 void prim_cons() { val = cons(car(argl), cadr(argl)); }
 void prim_pairp() { val = is_pair(car(argl)) ? True : False; }
 void prim_nullp() { val = (car(argl) == NIL ? True : False); }
-void prim_display() { display(car(argl)); }
+void prim_display() { display2(car(argl), 0, -10000); }
 void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
 void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
 void prim_exit() { longjmp(jmpbuf, 1); } 
