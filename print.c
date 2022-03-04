@@ -17,7 +17,11 @@ char *continuation_string[] = { "PRINT_RESULT", "EV_IF_DECIDE",
   "EV_SEQUENCE_LAST_EXP", "APPLY_DISPATCH", "PRIMITIVE_APPLY",
   "COMPOUND_APPLY", "UNKNOWN_PROCEDURE_TYPE", "UNKNOWN_EXPRESSION_TYPE" };
 
-void display2(Obj expr, int dotted) {
+void display2(Obj expr, int dotted, int level) {
+  if (level > 7) {
+    printf("...");
+    return;
+  }
   if (expr == BROKEN_TAG) {
     printf("XXX");
     return;
@@ -28,16 +32,20 @@ void display2(Obj expr, int dotted) {
       printf("()");
     else {
       if (car(expr) == PROCEDURE_SYM) { 
-	printf("<λ"); display(cadr(expr)); printf("."); display(caddr(expr)); printf(">");
+	printf("<λ");
+	display2(cadr(expr), 0, level+1);
+	printf(".");
+	display2(caddr(expr), 0, level+1);
+	printf(">");
 	break;
       } if (!dotted)
 	printf("(");
-      display(car(expr));
+      display2(car(expr), 0, level+1);
       if (cdr(expr) != NIL) {
 	printf(" ");
 	if (objtype(cdr(expr)) != PAIR_TAG)
 	  printf(". ");
-	display2(cdr(expr), 1);
+	display2(cdr(expr), 1, level+1);
       }
       if (!dotted)
 	printf(")");
@@ -69,11 +77,11 @@ void display2(Obj expr, int dotted) {
 }
 
 void display(Obj expr) {
-  display2(expr, 0);
+  display2(expr, 0, 0);
 }
 
 void display_registers(char *where) {
-  if (!verbose)
+  if (verbose != 1)
     return;
   printf("===============================%s=\n", where);
   printf("expr: "); display(expr); NL;

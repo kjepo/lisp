@@ -73,7 +73,7 @@ Obj cons(Obj car_, Obj cdr_) {
 typedef enum {
   PRIM_CAR, PRIM_CDR, PRIM_CONS, PRIM_PAIRP, PRIM_PLUS, PRIM_MINUS, PRIM_TIMES,
   PRIM_DIV, PRIM_EQ, PRIM_EQP, PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP,
-  PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT, PRIM_FILE } Primitive;
+  PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT, PRIM_FILE, PRIM_EVAL, PRIM_RND } Primitive;
 
 Obj mknum(int n) { return (n << 3) | NUM_TAG; }
 Obj mkstr(char *str) { return ((lookup(str)) << 3) | STR_TAG; }
@@ -228,7 +228,6 @@ void define_variable(Obj var, Obj val, Obj env) {
 
 void init_symbols() {
   False = mkbool("#f");  True = mkbool("#t");
-
   IF_SYM = mksym("if");  EQ_SYM = mksym("eq");  ADD_SYM = mksym("add");
   SUB_SYM = mksym("sub");  MUL_SYM = mksym("mul");  DIV_SYM = mksym("div");
   CAR_SYM = mksym("car");  CDR_SYM = mksym("cdr");  CONS_SYM = mksym("cons");
@@ -237,6 +236,7 @@ void init_symbols() {
   BEGIN_SYM = mksym("begin"); PROCEDURE_SYM = mksym("procedure");
   val = unev = argl = proc = stack = NIL;
   cont = mknum(EVAL_DISPATCH);
+  srandom(getpid());
 }
 
 void init_env() {
@@ -263,6 +263,9 @@ void init_env() {
   add_binding(mksym("null?"), mkprim(PRIM_NULLP), prim_proc);
   add_binding(mksym("exit"), mkprim(PRIM_EXIT), prim_proc);
   add_binding(mksym("file"), mkprim(PRIM_FILE), prim_proc);
+  add_binding(mksym("eval"), mkprim(PRIM_EVAL), prim_proc);
+  add_binding(mksym("rnd"), mkprim(PRIM_RND), prim_proc);
+  add_binding(mksym("current-environment"), prim_proc, prim_proc);
 }
 
 int is_num(Obj p)        { return NUM_TAG == objtype(p); }
@@ -283,7 +286,7 @@ int is_lambda()          { return is_pair(expr) && LAMBDA_SYM == car(expr); }
 int is_begin()           { return is_pair(expr) && BEGIN_SYM == car(expr); }
 int is_application()     { return is_pair(expr); }
 
-void verify_list(Obj p, char *fcnname) {
+void checklist(Obj p, char *fcnname) {
   if (is_pair(p))
     return;
   printf("The object "); display(p);
@@ -292,7 +295,7 @@ void verify_list(Obj p, char *fcnname) {
   longjmp(jmpbuf, 1);
 }
 
-int ensure_numerical(Obj p, char *opname) {
+int checknr(Obj p, char *opname) {
   if (is_num(p))
     return objval(p);
   printf("The object "); display(p);
@@ -302,31 +305,41 @@ int ensure_numerical(Obj p, char *opname) {
 
 // argl is a list of arguments (a1 a2 a3 .. aN)
 // if the primitive function only takes one argument, it is a1; if it's two then it's a1 and a2
-void prim_plus()    { val = mknum(ensure_numerical(car(argl), "plus") + ensure_numerical(cadr(argl), "plus")); }
-void prim_minus()   { val = mknum(ensure_numerical(car(argl), "minus") - ensure_numerical(cadr(argl), "minus")); }
-void prim_times()   { val = mknum(ensure_numerical(car(argl), "times") * ensure_numerical(cadr(argl), "times")); }
-void prim_div()   { val = mknum(ensure_numerical(car(argl), "times") / ensure_numerical(cadr(argl), "div")); }
-void prim_eq()      { val = ensure_numerical(car(argl), "=") == ensure_numerical(cadr(argl), "=") ? True : False; }
-void prim_lt()      { val = ensure_numerical(car(argl), "<") < ensure_numerical(cadr(argl), "<") ? True : False; }
-void prim_gt()      { val = ensure_numerical(car(argl), ">") > ensure_numerical(cadr(argl), ">") ? True : False; }
-void prim_eqp()     { val = (objval(car(argl)) == objval(cadr(argl))) ? True : False; }
-void prim_car()     { verify_list(car(argl), "car"); val = car(car(argl)); }
-void prim_cdr()     { verify_list(car(argl), "cdr"); val = cdr(car(argl)); }
-void prim_cons()    { val = cons(car(argl), cadr(argl)); }
-void prim_pairp()   { val = is_pair(car(argl)) ? True : False; }
-void prim_nullp()   { val = (car(argl) == NIL ? True : False); }
+void prim_plus() { val = mknum(checknr(car(argl), "plus") + checknr(cadr(argl), "plus")); }
+void prim_minus() { val = mknum(checknr(car(argl), "minus") - checknr(cadr(argl), "minus")); }
+void prim_times() { val = mknum(checknr(car(argl), "times") * checknr(cadr(argl), "times")); }
+void prim_div() { val = mknum(checknr(car(argl), "times") / checknr(cadr(argl), "div")); }
+void prim_eq() { val = checknr(car(argl), "=") == checknr(cadr(argl), "=") ? True : False; }
+void prim_lt() { val = checknr(car(argl), "<") < checknr(cadr(argl), "<") ? True : False; }
+void prim_gt() { val = checknr(car(argl), ">") > checknr(cadr(argl), ">") ? True : False; }
+void prim_eqp() { val = (objval(car(argl)) == objval(cadr(argl))) ? True : False; }
+void prim_car() { checklist(car(argl), "car"); val = car(car(argl)); }
+void prim_cdr() { checklist(car(argl), "cdr"); val = cdr(car(argl)); }
+void prim_cons() { val = cons(car(argl), cadr(argl)); }
+void prim_pairp() { val = is_pair(car(argl)) ? True : False; }
+void prim_nullp() { val = (car(argl) == NIL ? True : False); }
 void prim_display() { display(car(argl)); }
 void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
 void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
-void prim_exit()    { longjmp(jmpbuf, 1); } 
-void prim_file()    { val = cons(mknum(lineno-1), cons(mkstr(fname), NIL)); }
+void prim_exit() { longjmp(jmpbuf, 1); } 
+void prim_file() { val = cons(mknum(lineno-1), cons(mkstr(fname), NIL)); }
+void eval();
+void prim_rnd() { val = mknum(random() & 0xffff); } 
+void prim_eval() {		/* (eval '(plus 1 2) current-environment */
+  push(expr); push(env);
+  expr = car(argl);
+  if (cadr(argl) != NIL)
+    env = cadr(argl);
+  eval();
+  env = pop(); expr = pop();
+}
 
 void (*primitives[])() = {
   prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times,
   prim_div, prim_eq, prim_eqp, prim_lt, prim_gt, prim_display, prim_numberp,
-  prim_symbolp, prim_nullp, prim_exit, prim_file };
+  prim_symbolp, prim_nullp, prim_exit, prim_file, prim_eval, prim_rnd };
 
-void eval() {
+void eval() {			// evaluate expr in env
   label = EVAL_DISPATCH;
   cont = mknum(PRINT_RESULT);
   for (;;) {
@@ -380,7 +393,6 @@ void eval() {
       primitives[objval(proc)]();
       cont = pop();
       label = objval(cont);
-      display_registers("PRIMITIVE_APPLY PROLOG");
       continue;
 
     case COMPOUND_APPLY:
@@ -388,7 +400,9 @@ void eval() {
       unev = cadr(proc);      /* procedure parameters */
       env = cadddr(proc);     /* procedure environment */
       env = bind(unev, argl, env);   /* bind formals to arguments */
+      //      printf("COMPOUND_APPLY II: env = "); display(env); NL;
       unev = caddr(proc);     /* procedure body */
+      //      printf("COMPOUND_APPLY II: unev = "); display(unev); NL;
       label = EV_SEQUENCE;
       continue;
 
@@ -561,10 +575,6 @@ void eval() {
       continue;
 
     case PRINT_RESULT:
-      if (fp == stdin) {
-	printf(";Value: ");
-	display(val); NL;
-      }
       return;
 
     case UNKNOWN_EXPRESSION_TYPE:
@@ -805,6 +815,10 @@ void repl() {
     expr = parse();	      // printf("expr = "); display(expr); NL;
     env = prim_proc;
     eval();
+    if (fp == stdin || verbose == -1) {
+      printf(";Value: ");
+      display(val); NL;
+    }
   }
 }
 
@@ -846,6 +860,8 @@ int main(int argc, char *argv[]) {
 	libloaded = 1;
       } else if (argv[i][1] == 'v') {
         verbose = 1;
+      } else if (argv[i][1] == 's') {
+        verbose = -1;
       } else if (argv[i][1] == 'h') {
         printf(usage, progname);
 	printf("  _    _           This Lisp interpreter accepts the following commands:\n");

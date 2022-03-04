@@ -199,4 +199,34 @@
 
 (assert (map zero? '(0 1 2)) '(#t #f #f))
 
+; (assert (eval '(plus 1 2) current-environment) 3)
+
+
+(define pp
+  (lambda (alist)
+
+    (define pp1
+      (lambda (item)
+	(display (car item))
+	(display ": ")
+	(display (cdr item))
+	(newline)))
+
+    (define pp2
+      (lambda (list)
+	(if (eq? alist '())
+	    (newline)
+	    (begin
+	      (pp1 (car list))
+	      (pp2 (cdr list))))))
+
+    (display "Environment:") (newline)
+    (pp2 alist)))
+
+
+
+
+
+
 (display "lib.scm loaded\n")
+
