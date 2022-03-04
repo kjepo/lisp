@@ -1,5 +1,5 @@
 CC	= gcc
-CFLAGS	= -pg -I/opt/homebrew/opt/readline/include/
+CFLAGS	= -g -I/opt/homebrew/opt/readline/include/
 LDFLAGS = -lreadline
 DEPS	= gc.h hashtab.h print.h lisp.h
 OBJ	= gc.o hashtab.o print.o lisp.o

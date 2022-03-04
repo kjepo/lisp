@@ -73,7 +73,7 @@ Obj cons(Obj car_, Obj cdr_) {
 typedef enum {
   PRIM_CAR, PRIM_CDR, PRIM_CONS, PRIM_PAIRP, PRIM_PLUS, PRIM_MINUS, PRIM_TIMES,
   PRIM_DIV, PRIM_EQ, PRIM_EQP, PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP,
-  PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT, PRIM_FILE, PRIM_EVAL, PRIM_RND } Primitive;
+  PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT, PRIM_FILE, PRIM_EVAL } Primitive;
 
 Obj mknum(int n) { return (n << 3) | NUM_TAG; }
 Obj mkstr(char *str) { return ((lookup(str)) << 3) | STR_TAG; }
@@ -264,7 +264,6 @@ void init_env() {
   add_binding(mksym("exit"), mkprim(PRIM_EXIT), prim_proc);
   add_binding(mksym("file"), mkprim(PRIM_FILE), prim_proc);
   add_binding(mksym("eval"), mkprim(PRIM_EVAL), prim_proc);
-  add_binding(mksym("rnd"), mkprim(PRIM_RND), prim_proc);
   add_binding(mksym("current-environment"), prim_proc, prim_proc);
 }
 
@@ -323,7 +322,6 @@ void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
 void prim_exit() { longjmp(jmpbuf, 1); } 
 void prim_file() { val = cons(mknum(lineno-1), cons(mkstr(fname), NIL)); }
 void eval();
-void prim_rnd() { val = mknum(random() & 0xffff); } 
 void prim_eval() {		/* (eval '(plus 1 2) current-environment */
   push(expr); push(env);
   expr = car(argl);
@@ -336,7 +334,7 @@ void prim_eval() {		/* (eval '(plus 1 2) current-environment */
 void (*primitives[])() = {
   prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times,
   prim_div, prim_eq, prim_eqp, prim_lt, prim_gt, prim_display, prim_numberp,
-  prim_symbolp, prim_nullp, prim_exit, prim_file, prim_eval, prim_rnd };
+  prim_symbolp, prim_nullp, prim_exit, prim_file, prim_eval };
 
 void eval() {			// evaluate expr in env
   label = EVAL_DISPATCH;

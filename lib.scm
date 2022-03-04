@@ -223,10 +223,19 @@
     (display "Environment:") (newline)
     (pp2 alist)))
 
+;;; a mod b = a - b*int(a/b)
+(define mod
+  (lambda (a b)
+    (- a (* b (/ a b)))))
 
-
-
-
+;;; Simple LCG random number generator
+;;; X_{n+1} = (a*X_n + c) mod m with m = 2^16+1, a = 75, c = 74
+;;; See https://en.wikipedia.org/wiki/Linear_congruential_generator
+(define *seed* 0)
+(define random
+  (lambda ()
+    (set! *seed* (mod (+ (* 75 *seed*) 74) 65537))
+    *seed*))
 
 (display "lib.scm loaded\n")
 
