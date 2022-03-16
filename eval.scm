@@ -4,61 +4,61 @@
 (define eval*
   (lambda (exp env)
     (cond ((self-evaluating? exp)       ; 42, "foobar"
-	         exp)
-	        ((symbol? exp)                ; x, y, z
-	         (lookup exp env))
-	        ((eq? (car exp) 'quote)       ; (quote foo)
-	         (cadr exp))
+           exp)
+          ((symbol? exp)                ; x, y, z
+           (lookup exp env))
+          ((eq? (car exp) 'quote)       ; (quote foo)
+           (cadr exp))
           ((eq? (car exp) 'define)      ; (define foo 42)
            (define-variable!
              (cadr exp)                 ; variable
              (eval* (caddr exp) env)    ; value
              env))
-	        ((eq? (car exp) 'if)          ; (if cond exp1 exp2)
-	         (if (eval* (cadr exp) env)
-	             (eval* (caddr exp) env)
-	             (eval* (cadddr exp) env)))
+          ((eq? (car exp) 'if)          ; (if cond exp1 exp2)
+           (if (eval* (cadr exp) env)
+               (eval* (caddr exp) env)
+               (eval* (cadddr exp) env)))
           ((eq? (car exp) 'begin)       ; (begin exp1 exp2 ...)
            (eval-sequence (cdr exp) env))
-	        ((eq? (car exp) 'lambda)      ; (lambda (param1 param2 ...) body)
-	         (make-procedure
+          ((eq? (car exp) 'lambda)      ; (lambda (param1 param2 ...) body)
+           (make-procedure
             (cadr exp)                  ; parameters
             (cddr exp)                  ; body
             env))
-	        ((pair? exp)                  ; (f exp1 exp2 ... )
-	         (apply* (eval* (car exp) env)
-		               (list-of-values (cdr exp) env)))
-	        (else
-	         (error "Unknown expression type" exp)))))
+          ((pair? exp)                  ; (f exp1 exp2 ... )
+           (apply* (eval* (car exp) env)
+                   (list-of-values (cdr exp) env)))
+          (else
+           (error "Unknown expression type" exp)))))
 
 (define apply*
   (lambda (procedure arguments)
     (cond ((eq? (car procedure) 'primitive)
            (apply (cdr procedure) arguments))
-	        ((eq? (car procedure) 'procedure)
-	         (eval-sequence
-	          (caddr procedure)
-	          (extend-environment
-	           (cadr procedure)
-	           arguments
-	           (cadddr procedure))))
-	        (else
-	         (error "Unknown procedure type" procedure)))))
+          ((eq? (car procedure) 'procedure)
+           (eval-sequence
+            (caddr procedure)
+            (extend-environment
+             (cadr procedure)
+             arguments
+             (cadddr procedure))))
+          (else
+           (error "Unknown procedure type" procedure)))))
 
 (define eval-sequence
   (lambda (exps env)
     (cond ((null? (cdr exps))
-	         (eval* (car exps) env))
-	        (else
-	         (eval* (car exps) env)
-	         (eval-sequence (cdr exps) env)))))
+           (eval* (car exps) env))
+          (else
+           (eval* (car exps) env)
+           (eval-sequence (cdr exps) env)))))
 
 (define extend-environment
   (lambda (vars vals env)
     (if (null? vars) env
-	      (cons
-	       (cons (car vars) (car vals))
-	       (extend-environment (cdr vars) (cdr vals) env)))))
+        (cons
+         (cons (car vars) (car vals))
+         (extend-environment (cdr vars) (cdr vals) env)))))
 
 (define self-evaluating?
   (lambda (exp)
@@ -76,11 +76,11 @@
   (lambda (var env)
     (let ((v (assoc var env)))
       (if v (cdr v)
-	        (error "Error: unbound variable" var)))))
+          (error "Error: unbound variable" var)))))
 
 (define (prepend! x l)
   (let ((first (car l))
-	      (rest (cdr l)))
+        (rest (cdr l)))
     (set-car! l x)
     (set-cdr! l (cons first rest))))
 
@@ -92,7 +92,7 @@
   (let ((v (assoc var env)))
     (if v
         (set-cdr! v val)
-	      (add-binding! var val env))))
+        (add-binding! var val env))))
 
 (define env0                            ; initial environment
   (list (cons 'car (cons 'primitive car))
