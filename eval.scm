@@ -25,8 +25,8 @@
             (cadr exp)                  ; parameters
             (cddr exp)                  ; body
             env))
-          ((macro? exp)                 ; macro
-           (eval* (macro-expand exp) env))
+          ((macro? exp env)             ; macro
+           (eval* (macro-expand exp env) env))
           ((pair? exp)                  ; (f exp1 exp2 ... )
            (apply* (eval* (car exp) env)
                    (list-of-values (cdr exp) env)))
@@ -96,16 +96,6 @@
         (set-cdr! v val)
         (add-binding! var val env))))
 
-(define env0                            ; initial environment
-  (list (cons 'car (cons 'primitive car))
-        (cons 'cdr (cons 'primitive cdr))
-        (cons 'cons (cons 'primitive cons))
-        (cons 'eq? (cons 'primitive eq?))
-        (cons '+ (cons 'primitive +))
-        (cons '- (cons 'primitive -))
-        (cons '> (cons 'primitive >))
-        (cons '< (cons 'primitive <))))
-
 ;;; (or e1 e2 ...) => (if e1 #t (or e2 ...))
 (define macro-or
   (lambda (operands)
@@ -126,23 +116,33 @@
          (list 'if (caar body) (cadar body))
          (list (macro-cond (cdr body)))))))
 
-(define macros                          ; initial macro definitions
-  (list (cons 'or macro-or)
-        (cons 'and macro-and)
-        (cons 'cond macro-cond)))
+(define env0                            ; initial environment
+  (list (cons 'car (cons 'primitive car))
+        (cons 'cdr (cons 'primitive cdr))
+        (cons 'cons (cons 'primitive cons))
+        (cons 'eq? (cons 'primitive eq?))
+        (cons '+ (cons 'primitive +))
+        (cons '- (cons 'primitive -))
+        (cons '> (cons 'primitive >))
+        (cons '< (cons 'primitive <))
+        (cons 'or (cons 'macro macro-or))
+        (cons 'and (cons 'macro macro-and))
+        (cons 'cond (cons 'macro macro-cond))))
 
+;;; see if (f e1 e2 ...) is a macro call, i.e., if f has a macro property
 (define macro?
-  (lambda (exp)
-    (and
-     (pair? exp)
-     (assoc (car exp) macros))))
+  (lambda (exp env)
+    (if (pair? exp)
+        (let ((m (assoc (car exp) env)))
+          (and (pair? m) (eq? (cadr m) 'macro)))
+        #f)))
 
 (define macro-expand
-  (lambda (macro)
-    (let ((m (assoc (car macro) macros)))
+  (lambda (exp env)
+    (let ((m (assoc (car exp) env)))
       (if m
-          ((cdr m) (cdr macro))
-          (error "No macro expansion for " macro)))))
+          ((cddr m) (cdr exp))
+          (error "No macro expansion for " exp)))))
 
 (eval* '3 env0)
 (eval* 'foo '((foo . 17)))
@@ -159,6 +159,5 @@
 (eval* '(and (eq? 3 3) (eq? 2 2)) env0)
 (eval* '(and (eq? 3 3) (eq? 2 2) (eq? 5 4)) env0)
 (eval* '(begin
-          (define zero? (lambda (x) (cond ((eq? x 0) #t) (#t #f))))
           (define abs (lambda (x) (cond ((< x 0) (- 0 x)) ((> x 0) x) (#t 0))))
           (abs -4)) env0)
