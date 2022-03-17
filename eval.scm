@@ -47,21 +47,6 @@
           (else
            (error "Unknown procedure type" procedure)))))
 
-(define eval-sequence
-  (lambda (exps env)
-    (cond ((null? (cdr exps))
-           (eval* (car exps) env))
-          (else
-           (eval* (car exps) env)
-           (eval-sequence (cdr exps) env)))))
-
-(define extend-environment
-  (lambda (vars vals env)
-    (if (null? vars) env
-        (cons
-         (cons (car vars) (car vals))
-         (extend-environment (cdr vars) (cdr vals) env)))))
-
 (define self-evaluating?
   (lambda (exp)
     (or (number? exp) (string? exp) (boolean? exp))))
@@ -70,9 +55,28 @@
   (lambda (parameters body env)
     (list 'procedure parameters body env)))
 
+;;; apply eval* to every exp in exps and return the last evaluation
+(define eval-sequence
+  (lambda (exps env)
+    (cond ((null? (cdr exps))
+           (eval* (car exps) env))
+          (else
+           (eval* (car exps) env)
+           (eval-sequence (cdr exps) env)))))
+
 (define list-of-values
   (lambda (exps env)
     (map (lambda (exp) (eval* exp env)) exps)))
+
+;;; environments are represented as a list of ( var . value ) pairs
+
+;;; extend env with ( var . val ) for each var in vars and val in vals
+(define extend-environment
+  (lambda (vars vals env)
+    (if (null? vars) env
+        (cons
+         (cons (car vars) (car vals))
+         (extend-environment (cdr vars) (cdr vals) env)))))
 
 (define lookup
   (lambda (var env)
@@ -117,16 +121,16 @@
          (list (macro-cond (cdr body)))))))
 
 (define env0                            ; initial environment
-  (list (cons 'car (cons 'primitive car))
-        (cons 'cdr (cons 'primitive cdr))
+  (list (cons 'car  (cons 'primitive car))
+        (cons 'cdr  (cons 'primitive cdr))
         (cons 'cons (cons 'primitive cons))
-        (cons 'eq? (cons 'primitive eq?))
-        (cons '+ (cons 'primitive +))
-        (cons '- (cons 'primitive -))
-        (cons '> (cons 'primitive >))
-        (cons '< (cons 'primitive <))
-        (cons 'or (cons 'macro macro-or))
-        (cons 'and (cons 'macro macro-and))
+        (cons 'eq?  (cons 'primitive eq?))
+        (cons '+    (cons 'primitive +))
+        (cons '-    (cons 'primitive -))
+        (cons '>    (cons 'primitive >))
+        (cons '<    (cons 'primitive <))
+        (cons 'or   (cons 'macro macro-or))
+        (cons 'and  (cons 'macro macro-and))
         (cons 'cond (cons 'macro macro-cond))))
 
 ;;; see if (f e1 e2 ...) is a macro call, i.e., if f has a macro property
@@ -144,6 +148,7 @@
           ((cddr m) (cdr exp))
           (error "No macro expansion for " exp)))))
 
+;; test cases
 (eval* '3 env0)
 (eval* 'foo '((foo . 17)))
 (eval* '(quote fum) env0)
