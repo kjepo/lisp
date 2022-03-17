@@ -8,27 +8,27 @@ eat junk food and watch TV?
 
 Anyway...
 
-Any college course covering Lisp or functional programming is likely
+Any college course in Lisp or functional programming is likely
 to cover the implementation of a Lisp interpreter in Lisp itself.
 (If you are not familiar with the traditional eval/apply rendition of a
 Lisp interpreter, please watch "The most beautiful program ever written"
 by William Byrd, [https://www.youtube.com/watch?v=OyfBQmvr2Hc]) or read
 "Structure and Interpretation of Computer Programs" (SICP) chapter 4.
-I have provided a sample implementation, see `eval.scm` which should
+I have provided a sample implementation `eval.scm` which should
 run in, e.g., MIT Scheme.
 
 The interpreter in `eval.scm` takes advantage of the host language
 for garbage collection, recursion, etc.  The code in `explicit.scm` 
-is a register machine implementation of the interpreter (still written 
-in Scheme).  Rather than the recursive apply/eval description we have 
+is a register machine implementation of the interpreter, still written 
+in Scheme.  Rather than the recursive apply/eval description we have 
 made the control and arguments explicit so that we don't depend on 
-the host language for recursion etc.  The code is based on SICP, 
-chapter 5 (and forwards).
+the host language for recursion.
+The code is based on SICP, chapter 5 (and forwards).
 
 The next step was to write the same code in C (file `lisp.c`) to
-get even closer to the machine and implement garbage collection.
-The interpreter is now working and can load the library file `lib.scm`
-Here is a small example:
+get even closer to the machine, represent objects and implement 
+garbage collection.  The interpreter is now working and can load 
+the library file `lib.scm`.  Here is a small example:
 
 ```
 ;;; zero? returns #t if x is zero, #f otherwise
