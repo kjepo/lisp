@@ -1,5 +1,6 @@
-;;; Simple eval/apply interpreter for a small Scheme-like language.
-;;; Written for MIT Scheme
+;;; Simple eval/apply interpreter for a small Scheme language.
+;;; This is loosely based on "Structure and Interpretations of
+;;; Computer Programs" chapter 4 and is written for MIT Scheme
 
 (define eval*
   (lambda (exp env)
