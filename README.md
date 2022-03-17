@@ -8,18 +8,25 @@ eat junk food and watch TV?
 
 Anyway...
 
-The original code in `explicit.scm` is a register machine implementation
-of a Lisp interpreter written in Scheme.
-Rather than the usual recursive apply/eval description of the interpreter,
-we have made the control and arguments explicit so that we don't depend
-on the host language for recursion etc.
-The code is based on SICP, chapter 5 (and forwards).
-
+Any college course covering Lisp or functional programming is likely
+to cover the implementation of a Lisp interpreter in Lisp itself.
 (If you are not familiar with the traditional eval/apply rendition of a
 Lisp interpreter, please watch "The most beautiful program ever written"
-by William Byrd, [https://www.youtube.com/watch?v=OyfBQmvr2Hc])
+by William Byrd, [https://www.youtube.com/watch?v=OyfBQmvr2Hc]) or read
+"Structure and Interpretation of Computer Programs" (SICP) chapter 4.
+I have provided a sample implementation, see `eval.scm` which should
+run in, e.g., MIT Scheme.
 
-The next step was to write the same code in C (file `lisp.c`).
+The interpreter in `eval.scm` takes advantage of the host language
+for garbage collection, recursion, etc.  The code in `explicit.scm` 
+is a register machine implementation of the interpreter (still written 
+in Scheme).  Rather than the recursive apply/eval description we have 
+made the control and arguments explicit so that we don't depend on 
+the host language for recursion etc.  The code is based on SICP, 
+chapter 5 (and forwards).
+
+The next step was to write the same code in C (file `lisp.c`) to
+get even closer to the machine and implement garbage collection.
 The interpreter is now working and can load the library file `lib.scm`
 Here is a small example:
 
@@ -52,8 +59,9 @@ A larger example can be found in the file `differentiate.scm`: just type
 Currently, the interpreter can read and parse Lisp - both from standard input
 (using GNU's readline), or from external files. The register machine can evaluate
 Lisp expressions with proper tail recursion and invoke a stop-and-copy garbage
-collector when it runs out of memory.  The parser and interpreter is only 900 lines
-of code, but some external files handle printing, the symbol table and garbage collection.
+collector when it runs out of memory.  The parser and interpreter is only about 
+900 lines of code, but some external files handle printing, the symbol table and 
+garbage collection.
 
 The informal description of the language is as follows:
 ```
@@ -408,7 +416,10 @@ are a few things I'd like to do:
 - When out of memory, the interpreter doesn't recover nicely (GC doesn't work).
 - There's a bug when an error is reported: the line number shown is from the expression that initiated the call, and not the actual line where the error occurred.
 - Parse command line arguments in a more conventional way so we don't have to write `lisp -h -q` but rather `lisp -hq`.
-
+- (display expr) needs additional argument for how deep it should print
+- Segmentation fault if you omit the last ')' in play (game2.scm)
+- In Scheme, `1+` can be an identifier.
+- Allow (lambda (x. y) ...) as in other Lisp, where y is bound to the cdr of the argument.
 
 # References
 
