@@ -9,7 +9,7 @@
            (lookup exp env))
           ((eq? (car exp) 'quote)       ; (quote foo)
            (cadr exp))
-          ((eq? (car exp) 'define)      ; (define foo 42)
+          ((eq? (car exp) 'define)      ; (define fum 42)
            (define-variable!
              (cadr exp)                 ; variable
              (eval* (caddr exp) env)    ; value
@@ -25,9 +25,9 @@
             (cadr exp)                  ; parameters
             (cddr exp)                  ; body
             env))
-          ((macro? exp env)             ; macro
+          ((macro? exp env)             ; macro application
            (eval* (macro-expand exp env) env))
-          ((pair? exp)                  ; (f exp1 exp2 ... )
+          ((pair? exp)                  ; function application
            (apply* (eval* (car exp) env)
                    (list-of-values (cdr exp) env)))
           (else
@@ -159,5 +159,9 @@
 (eval* '(and (eq? 3 3) (eq? 2 2)) env0)
 (eval* '(and (eq? 3 3) (eq? 2 2) (eq? 5 4)) env0)
 (eval* '(begin
-          (define abs (lambda (x) (cond ((< x 0) (- 0 x)) ((> x 0) x) (#t 0))))
+          (define abs
+            (lambda (x)
+              (cond ((< x 0) (- 0 x))
+                    ((> x 0) x)
+                    (#t 0))))
           (abs -4)) env0)
