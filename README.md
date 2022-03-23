@@ -152,8 +152,8 @@ to `#f`.  A naive implementation
 ```
 
 will not do because both arguments to `and` are evaluated before the `if` is evaluated,
-thus causing `(and #t ((lambda (x) (x x)) (lambda (x) (x x))))` to loop forever.
-(The second argument is an infinite loop.)
+thus causing `(and #f ((lambda (x) (x x)) (lambda (x) (x x))))` to loop forever rather
+than just returning `#f`. (The second argument is an infinite loop.)
 
 With a macro we can delay the evaluation of the arguments until they are needed.
 
