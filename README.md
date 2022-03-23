@@ -173,8 +173,8 @@ With a macro we can delay the evaluation of the arguments until they are needed.
 
 Here, `and` accepts an unevaluated list of arguments `xs` and passes it on to `and$` together
 with the implicit environment `$env` which is a special value bound to the caller's environment.
-If `eval` (inside `and$`) didn't use this environment, the macro would be evaluated in environment
-of `and` which is not what we want.
+If `eval` (inside `and$`) didn't use this environment, the macro would be evaluated in the 
+environment of `and` which is not what we want.
 
  
 # Implementation details
