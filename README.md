@@ -132,7 +132,49 @@ being parsed.
 - The primitive `(exit)` returns to the top-level loop.
 - The variable `current-environment` contains the current environment.
 - The primitive `(eval expr env)` evaluates `expr` in the environment `env`, for instance
-`(eval '(plus 1 2) current-environment)` ⇒ 3.
+`(eval '(plus 1 2) current-environment)` ⇒ 3.  If the environment is not supplied, 
+the interpreter tries to use the implicit environment `$env` which is available inside
+an `nlambda`-expression (see below).  If `$env` is not available, the current environment is used.
+
+# Macros
+
+A simple macro mechanism is now available.  Scheme uses a rather fancy macro system
+which I considered too complicated for my purposes.  Instead, I implemented `nlambda`
+which behaves like `lambda` except that the arguments are not evaluated. Together with
+`eval`, this makes it possible to define the special forms `and`, `or` and `cond` within
+the language itself.  Remember that `(and e1 e2)` should not evaluate `e2` if `e1` evaluates
+to `#f`.  A naive implementation 
+
+```
+(define and
+  (lambda (e1 e2)
+    (if (e1) e2 #f)))
+```
+
+will not do because both arguments to `and` are evaluated before the `if` is evaluated,
+thus causing `(and #t ((lambda (x) (x x)) (lambda (x) (x x))))` to loop forever.
+(The second argument is an infinite loop.)
+
+With a macro we can delay the evaluation of the arguments until they are needed.
+
+```
+(define and
+  (nlambda xs
+           (and$ xs $env)))
+
+(define and$
+  (lambda (xs env)
+    (if (null? xs)
+        #t
+        (if (eval (car xs) env)
+            (and$ (cdr xs) env)
+            #f))))
+```
+
+Here, `and` accepts an unevaluated list of arguments `xs` and passes it on to `and$` together
+with the implicit environment `$env` which is a special value bound to the caller's environment.
+If `eval` (inside `and$`) didn't use this environment, the macro would be evaluated in environment
+of `and` which is not what we want.
 
 # Implementation details
 
