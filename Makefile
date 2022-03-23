@@ -1,4 +1,5 @@
 CC	= gcc
+# uncomment the following line if you are on e.g. Linux
 CFLAGS	= -g -I/opt/homebrew/opt/readline/include/
 LDFLAGS = -lreadline
 DEPS	= gc.h hashtab.h print.h lisp.h

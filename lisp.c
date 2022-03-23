@@ -1,9 +1,9 @@
  /**
-  * A simple explicit-control, garbage-collecting    _    _           
-  * register-machine Scheme-like Lisp interpreter   | |  (_)____ __   
+  * A simple explicit-control, garbage-collecting    _    _
+  * register-machine Scheme-like Lisp interpreter   | |  (_)____ __
   * written in 2022 by Kjell Post, but based on a   | |__| (_-< '_ \
-  * dormant project from a college course in 1986   |____|_/__/ .__/  
-  *                                                           |_|     
+  * dormant project from a college course in 1986   |____|_/__/ .__/
+  *                                                           |_|
  **/
 
 #include <stdio.h>
@@ -101,16 +101,24 @@ void gc_need(int n) {
     error("Out of memory");
 }
 
-// a procedure is a triple (parameters body env)
-Obj mkproc(Obj parameters, Obj body, Obj env) { 
+// a procedure is a quadruple (PROCEDURE parameters body env)
+Obj mkproc(Obj parameters, Obj body, Obj env) {
   tmp1 = env;  tmp2 = body;  tmp3 = parameters;
   gc_need(5);
   parameters = tmp3; body = tmp2; env = tmp1;
   return cons(PROCEDURE_SYM, cons(parameters, cons(body, cons(env, NIL))));
 }
 
+// a macro is a triple (MACRO parameters body), env is not used
+Obj mkmacro(Obj parameters, Obj body) {
+  tmp2 = body;  tmp3 = parameters;
+  gc_need(5);
+  parameters = tmp3; body = tmp2;
+  return cons(MACRO_SYM, cons(parameters, cons(body, NIL)));
+}
+
 // destructive append, sets the cdr of l to m (unless l is NIL of course)
-Obj concat(Obj l, Obj m) {   
+Obj concat(Obj l, Obj m) {
   Obj head = l;
   if (l == NIL)
     return m;
@@ -150,7 +158,7 @@ Obj pairup(Obj vars, Obj vals) {
   int m = length(vals);
   if (m != n) {
     display(vars); printf(" "); display(vals); NL;
-    error("Error: length mismatch between parameters and arguments");
+    error("Error in pairup: length mismatch between parameters and arguments");
     return NIL; 		// not reached
   } else {
     tmp1 = vars;
@@ -232,8 +240,9 @@ void init_symbols() {
   SUB_SYM = mksym("sub");  MUL_SYM = mksym("mul");  DIV_SYM = mksym("div");
   CAR_SYM = mksym("car");  CDR_SYM = mksym("cdr");  CONS_SYM = mksym("cons");
   QUOTE_SYM = mksym("quote"); DEFINE_SYM = mksym("define");
-  LAMBDA_SYM = mksym("lambda"); SETBANG_SYM = mksym("set!");
-  BEGIN_SYM = mksym("begin"); PROCEDURE_SYM = mksym("procedure");
+  LAMBDA_SYM = mksym("lambda");  NLAMBDA_SYM = mksym("nlambda");
+  SETBANG_SYM = mksym("set!");  BEGIN_SYM = mksym("begin");
+  PROCEDURE_SYM = mksym("procedure");  MACRO_SYM = mksym("macro");
   val = unev = argl = proc = stack = NIL;
   cont = mknum(EVAL_DISPATCH);
   srandom(getpid());
@@ -273,6 +282,7 @@ int is_bool(Obj p)       { return BOOL_TAG == objtype(p); }
 int is_variable()        { return SYMBOL_TAG == objtype(expr); }
 int is_primitive(Obj p)  { return PRIM_TAG == objtype(p); }
 int is_compound(Obj p)   { return is_pair(p) && PROCEDURE_SYM == car(p); }
+int is_macro(Obj p)      { return is_pair(p) && MACRO_SYM == car(p); }
 int is_nil(Obj p)        { return p == NIL; }
 int is_pair(Obj p)       { return PAIR_TAG == objtype(p) && !is_nil(p); }
 int is_self_evaluating() { return is_nil(expr) || is_num(expr) || is_str(expr) || is_bool(expr); }
@@ -281,6 +291,7 @@ int is_if()              { return is_pair(expr) && IF_SYM == car(expr); }
 int is_assignment()      { return is_pair(expr) && SETBANG_SYM == car(expr); }
 int is_definition()      { return is_pair(expr) && DEFINE_SYM == car(expr); }
 int is_lambda()          { return is_pair(expr) && LAMBDA_SYM == car(expr); }
+int is_nlambda()         { return is_pair(expr) && NLAMBDA_SYM == car(expr); }
 int is_begin()           { return is_pair(expr) && BEGIN_SYM == car(expr); }
 int is_application()     { return is_pair(expr); }
 
@@ -319,16 +330,23 @@ void prim_nullp() { val = (car(argl) == NIL ? True : False); }
 void prim_display() { display2(car(argl), 0, -10000); }
 void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
 void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
-void prim_exit() { longjmp(jmpbuf, 1); } 
+void prim_exit() { longjmp(jmpbuf, 1); }
 void prim_file() { val = cons(mknum(lineno-1), cons(mkstr(fname), NIL)); }
 void eval();
-void prim_eval() {		/* (eval '(plus 1 2) current-environment */
-  push(expr); push(env);
+void prim_eval() {
+  push(expr);
+  push(env);
   expr = car(argl);
-  if (cadr(argl) != NIL)
+  if (cadr(argl) != NIL)        // use supplied 2nd argument for environment
     env = cadr(argl);
+  else {                        // if we're inside an nlambda, use $env
+    Obj macroenv = assoc(mksym("$env"), env);
+    if (macroenv != NIL)
+      env = macroenv;
+  } 
   eval();
-  env = pop(); expr = pop();
+  env = pop();
+  expr = pop();
 }
 
 void (*primitives[])() = {
@@ -341,20 +359,6 @@ void eval() {			// evaluate expr in env
   cont = mknum(PRINT_RESULT);
   for (;;) {
     switch (label) {
-    case EV_APPL_DID_OPERATOR:
-      display_registers("EV_APPL_DID_OPERATOR");
-      unev = pop();
-      env = pop();
-      argl = NIL;
-      proc = val;
-      if (unev == NIL)          /* no operands */
-        label = APPLY_DISPATCH;
-      else {
-        push(proc);
-        label = EV_APPL_OPERAND_LOOP;
-      }
-      continue;
-
     case EV_APPL_OPERAND_LOOP:
       display_registers("EV_APPL_OPERAND_LOOP");
       push(argl);
@@ -373,32 +377,6 @@ void eval() {			// evaluate expr in env
       display_registers("EV_APPL_LAST_ARG");
       cont = mknum(EV_APPL_ACCUM_LAST_ARG);
       label = EVAL_DISPATCH;
-      continue;
-
-    case APPLY_DISPATCH:
-      display_registers("APPLY_DISPATCH");
-      if (is_primitive(proc))
-        label = PRIMITIVE_APPLY;
-      else if (is_compound(proc))
-        label = COMPOUND_APPLY;
-      else
-        label = UNKNOWN_PROCEDURE_TYPE;
-      continue;
-
-    case PRIMITIVE_APPLY:
-      display_registers("PRIMITIVE_APPLY");
-      primitives[objval(proc)]();
-      cont = pop();
-      label = objval(cont);
-      continue;
-
-    case COMPOUND_APPLY:
-      display_registers("COMPOUND_APPLY");
-      unev = cadr(proc);      /* procedure parameters */
-      env = cadddr(proc);     /* procedure environment */
-      env = bind(unev, argl, env);   /* bind formals to arguments */
-      unev = caddr(proc);     /* procedure body */
-      label = EV_SEQUENCE;
       continue;
 
     case EV_SEQUENCE:
@@ -421,6 +399,7 @@ void eval() {			// evaluate expr in env
       continue;
 
     case UNKNOWN_PROCEDURE_TYPE:
+      display_registers("UNKNOWN_PROCEDURE_TYPE");
       display(proc); NL;
       error("unknown procedure");
       continue;
@@ -545,9 +524,17 @@ void eval() {			// evaluate expr in env
 
     case EV_LAMBDA:
       display_registers("EV_LAMBDA");
-      unev = cadr(expr);        /* parameters */
-      expr = cddr(expr);        /* body */
+      unev = cadr(expr);        // parameters
+      expr = cddr(expr);        // body
       val = mkproc(unev, expr, env);
+      label = objval(cont);
+      continue;
+
+    case EV_NLAMBDA:
+      display_registers("EV_NLAMBDA");
+      unev = cadr(expr);        // parameters
+      expr = cddr(expr);        // body
+      val = mkmacro(unev, expr);  // env is not used
       label = objval(cont);
       continue;
 
@@ -558,7 +545,7 @@ void eval() {			// evaluate expr in env
       label = EV_SEQUENCE;
       continue;
 
-    case EV_APPLICATION:
+    case EV_APPLICATION:        // first evaluate operator
       display_registers("EV_APPLICATION");
       push(cont);
       push(env);
@@ -569,7 +556,61 @@ void eval() {			// evaluate expr in env
       label = EVAL_DISPATCH;
       continue;
 
+    case EV_APPL_DID_OPERATOR:
+      display_registers("EV_APPL_DID_OPERATOR");
+      unev = pop();
+      env = pop();
+      argl = NIL;
+      proc = val;
+      if (is_macro(proc))
+        label = APPLY_DISPATCH; // macros don't evaluate arguments
+      else if (unev == NIL)
+        label = APPLY_DISPATCH; // no arguments
+      else {                    // evaluate arguments
+        push(proc);
+        label = EV_APPL_OPERAND_LOOP;
+      }
+      continue;
+
+    case APPLY_DISPATCH:        // proc contains the evaluated operator
+      display_registers("APPLY_DISPATCH");
+      if (is_primitive(proc))
+        label = PRIMITIVE_APPLY;
+      else if (is_compound(proc))
+        label = COMPOUND_APPLY;
+      else if (is_macro(proc))
+        label = MACRO_APPLY;
+      else
+        label = UNKNOWN_PROCEDURE_TYPE;
+      continue;
+
+    case PRIMITIVE_APPLY:       // proc contains the evaluated operator
+      display_registers("PRIMITIVE_APPLY");
+      primitives[objval(proc)]();
+      cont = pop();
+      label = objval(cont);
+      continue;
+
+    case COMPOUND_APPLY:        // proc = (PROCEDURE parameters body env)
+      display_registers("COMPOUND_APPLY");
+      unev = cadr(proc);           // procedure parameters
+      env = cadddr(proc);          // procedure environment
+      env = bind(unev, argl, env); // bind formals to arguments
+      unev = caddr(proc);          // procedure body
+      label = EV_SEQUENCE;
+      continue;
+
+    case MACRO_APPLY:           // proc = (MACRO parameters body)
+      display_registers("MACRO_APPLY");
+      env = bind(cadr(proc), unev, env);
+      add_binding(mksym("$env"), env, env);
+      unev = caddr(proc);
+      label = EV_SEQUENCE;
+      display_registers("MACRO_APPLY [2]");
+      continue;
+
     case PRINT_RESULT:
+      display_registers("PRINT_RESULT");
       return;
 
     case UNKNOWN_EXPRESSION_TYPE:
@@ -594,6 +635,8 @@ void eval() {			// evaluate expr in env
         label = EV_DEFINITION;
       } else if (is_lambda()) {
         label = EV_LAMBDA;
+      } else if (is_nlambda()) {
+        label = EV_NLAMBDA;
       } else if (is_begin()) {
         label = EV_BEGIN;
       } else if (is_application()) {
@@ -633,7 +676,7 @@ void cmd(char *line) {
   } else if (0 == strcmp(line, ":env")) {
     display(env); NL;
   } else if (0 == strcmp(line, ":word")) {
-    printf("%lu\n", sizeof(Obj));    
+    printf("%lu\n", sizeof(Obj));
   } else if (0 == strcmp(line, ":mem")) {
     printf("%d/%d cells used\n", free_index, MEMSIZE);
   } else if (0 == strcmp(line, ":gc")) {
@@ -661,7 +704,7 @@ void cr_readline() {
     return cr_readline();
   }
   int n = strlen(p);
-  input = malloc(n + 1);
+  input = malloc(n + 2);
   strcpy(input, p);		/* fixme: memory leak */
   input[n] = '\n';		/* add \n at end of input */
   input[n+1] = 0;
@@ -669,12 +712,12 @@ void cr_readline() {
 
 char nextchar() {
   while (input == 0 || *input == 0 || *input == ';')
-    cr_readline();	
+    cr_readline();
   return *input++;
 }
 
 char nextrealchar() {
-  char ch; 
+  char ch;
   do {
     ch = nextchar();
   } while (ch == ' ' || ch == '\t');
@@ -741,8 +784,9 @@ Token scan() {
       if (sscanf(id, "%d%c", &nval, &cc) == 1 && cc == 0)
         return token = NUM;
       return token = ID;
-    } else
+    } else {
       return scan();
+    }
   }
 }
 
@@ -792,9 +836,12 @@ Obj parse() {
       return NIL;
     else
       return parse_seq();
+  } else if (token == RPAR) {
+    scan();
+    return -1;			/* tell REPL to ignore */
   } else {
     error("expected number, symbol, or '('.");
-    return -1;			/* never executed */
+    return -1;			/* tell REPL to ignore */
   }
 }
 
@@ -805,9 +852,11 @@ void repl() {
     scan();
     if (strncmp(input, "exit)", 5) == 0 && fp != stdin)
       return;  /* kludge to stop reading from file */
-    if (token == END)		/* reached trailing \n */
+    if (token == END)		// reached trailing \n
       continue;
     expr = parse();	      // printf("expr = "); display(expr); NL;
+    if (expr == -1)	      /* skip extraneous right parenthesis */
+      continue;
     env = prim_proc;
     eval();
     if (fp == stdin || verbose == -1) {
@@ -890,10 +939,4 @@ int main(int argc, char *argv[]) {
   fp = stdin;
   fname = "stdin";
   repl();
-
-  if (verbose) {
-    dump_memory();
-    printf("env: "); display(env); NL;
-    dump_hashtab();
-  }
 }

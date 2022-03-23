@@ -5,7 +5,7 @@
 
 int alloc;
 
-void mscopy(from) {
+void mscopy(int from) {
   newcars[alloc] = thecars[from];
   newcdrs[alloc] = thecdrs[from];
   alloc++;

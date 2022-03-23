@@ -1,6 +1,8 @@
 #ifndef LISPH
 #define LISPH
 
+#include <stdint.h>
+
 #define NL printf("\n");
 #define MEMSIZE (2<<25)
 #define STACKSIZE 100
@@ -26,7 +28,8 @@ extern int is_compound(Obj);
 extern Obj mkpointer(int);
 
 Obj *thecars, *thecdrs, *newcars, *newcdrs;
-extern Obj NIL, free_index, True, False, env, val, unev, argl, proc, expr, prim_proc, stack, conscell, tmp1, tmp2, tmp3;
+extern Obj NIL, free_index, True, False, env, val, unev, argl, proc;
+extern Obj expr, prim_proc, stack, conscell, tmp1, tmp2, tmp3;
 
 extern int verbose;
 
@@ -42,17 +45,17 @@ typedef enum { PRINT_RESULT, EV_IF_DECIDE, EV_IF_CONSEQUENT, EV_IF_ALTERNATIVE,
   EV_ASSIGNMENT_1, EV_DEFINITION_1, EV_APPL_DID_OPERATOR,
   EV_APPL_ACCUMULATE_ARG, EV_APPL_ACCUM_LAST_ARG, EV_SEQUENCE_CONTINUE,
   EVAL_DISPATCH, EV_SELF_EVAL, EV_VARIABLE, EV_QUOTED, EV_IF, EV_ASSIGNMENT,
-  EV_DEFINITION, EV_LAMBDA, EV_BEGIN, EV_APPLICATION, EV_APPL_OPERAND_LOOP,
+  EV_DEFINITION, EV_LAMBDA, EV_NLAMBDA, EV_BEGIN, EV_APPLICATION, EV_APPL_OPERAND_LOOP,
   EV_APPL_LAST_ARG, EV_SEQUENCE, EV_SEQUENCE_LAST_EXP, APPLY_DISPATCH,
-  PRIMITIVE_APPLY, COMPOUND_APPLY, UNKNOWN_PROCEDURE_TYPE,
+  PRIMITIVE_APPLY, COMPOUND_APPLY, MACRO_APPLY, UNKNOWN_PROCEDURE_TYPE,
   UNKNOWN_EXPRESSION_TYPE } Continuation;
 
-extern Continuation cont;
+extern Continuation cont, label;
 
 extern char *continuation_string[];
 
 Obj IF_SYM, EQ_SYM, ADD_SYM, SUB_SYM, MUL_SYM, DIV_SYM, DEFINE_SYM, CAR_SYM,
-  CDR_SYM, CONS_SYM, QUOTE_SYM, LAMBDA_SYM, SETBANG_SYM, BEGIN_SYM,
-  PROCEDURE_SYM;
+  CDR_SYM, CONS_SYM, QUOTE_SYM, LAMBDA_SYM, NLAMBDA_SYM, SETBANG_SYM, BEGIN_SYM,
+  PROCEDURE_SYM, MACRO_SYM;
 
 #endif

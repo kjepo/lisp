@@ -12,10 +12,11 @@ char *continuation_string[] = { "PRINT_RESULT", "EV_IF_DECIDE",
   "EV_DEFINITION_1", "EV_APPL_DID_OPERATOR", "EV_APPL_ACCUMULATE_ARG",
   "EV_APPL_ACCUM_LAST_ARG", "EV_SEQUENCE_CONTINUE", "EVAL_DISPATCH",
   "EV_SELF_EVAL", "EV_VARIABLE", "EV_QUOTED", "EV_IF", "EV_ASSIGNMENT",
-  "EV_DEFINITION", "EV_LAMBDA", "EV_BEGIN", "EV_APPLICATION",
+  "EV_DEFINITION", "EV_LAMBDA", "EV_NLAMBDA", "EV_BEGIN", "EV_APPLICATION",
   "EV_APPL_OPERAND_LOOP", "EV_APPL_LAST_ARG", "EV_SEQUENCE",
   "EV_SEQUENCE_LAST_EXP", "APPLY_DISPATCH", "PRIMITIVE_APPLY",
-  "COMPOUND_APPLY", "UNKNOWN_PROCEDURE_TYPE", "UNKNOWN_EXPRESSION_TYPE" };
+  "COMPOUND_APPLY", "MACRO_APPLY", "UNKNOWN_PROCEDURE_TYPE",
+  "UNKNOWN_EXPRESSION_TYPE" };
 
 void display2(Obj expr, int dotted, int level) {
   if (level > 7) {
@@ -83,7 +84,7 @@ void display(Obj expr) {
 void display_registers(char *where) {
   if (verbose != 1)
     return;
-  printf("===============================%s=\n", where);
+  printf("===============================%s (%d)=\n", where, label);
   printf("expr: "); display(expr); NL;
   printf("env:  "); display(env); NL;
   printf("cont: "); printf("%s\n", continuation_string[objval(cont)]);
@@ -91,6 +92,7 @@ void display_registers(char *where) {
   printf("unev: "); display(unev); NL;
   printf("argl: "); display(argl); NL;
   printf("proc: "); display(proc); NL;
+  printf("stack:"); display(stack); NL;
   printf("========================================\n");
 }
 
