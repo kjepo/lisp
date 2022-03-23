@@ -176,6 +176,7 @@ with the implicit environment `$env` which is a special value bound to the calle
 If `eval` (inside `and$`) didn't use this environment, the macro would be evaluated in environment
 of `and` which is not what we want.
 
+ 
 # Implementation details
 
 While writing the interpreter I was faced with several difficulties which
