@@ -19,7 +19,7 @@ char *continuation_string[] = { "PRINT_RESULT", "EV_IF_DECIDE",
   "UNKNOWN_EXPRESSION_TYPE" };
 
 void display2(Obj expr, int dotted, int level) {
-  if (level > 7) {
+  if (level > 10) {
     printf("...");
     return;
   }

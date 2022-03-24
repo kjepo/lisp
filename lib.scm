@@ -1,8 +1,16 @@
+;;; This file should be loaded initially
+;;; to define various utility functions.
+
 (define nil ())
 
 (define newline
   (lambda ()
     (display "\n")))
+
+;;; (not x) ==> #f if x evaluates to #t, #t otherwise
+(define not
+  (lambda (x)
+    (if x #f #t)))
 
 ;;; (and x1 x2 ... ) ==> #t if all xs evaluate to #t, otherwise #f
 (define and
@@ -42,6 +50,25 @@
             (eval (cadar body) env)
             (cond$ (cdr body) env)))))
 
+;;; (eval-sequence xs env) -- evaluate all x in xs, in environment env
+(define eval-sequence
+  (lambda (xs env)
+    (cond ((null? xs) nil)
+          ((null? (cdr xs)) (eval (car xs) env))
+          (#t (begin
+                (eval (car xs) env)
+                (eval-sequence (cdr xs) env))))))
+
+;;; (when condition x1 x2 ...) ==> (if condition (begin x1 x2 ...))
+(define when
+  (nlambda body
+    (when$ body $env)))
+
+(define when$
+  (lambda (body env)
+    (if (eval (car body) env)
+        (eval-sequence (cdr body) env))))
+
 ;;; (equal? x y) ==> #t if x and y are structurally equal, #f otherwise
 (define equal?
   (lambda (x y)
@@ -69,7 +96,6 @@
 	        (display (eq? (car x) (car y))) (newline)
 	        (newline)
           (exit)))))
-
 
 (assert (and) #t)
 (assert (and #t) #t)
@@ -122,11 +148,10 @@
 (define append
   (lambda (x y)
     (if (null? x) y
-	(cons (car x)
-	      (append (cdr x) y)))))
+	      (cons (car x)
+	            (append (cdr x) y)))))
 
 (assert (append '(1 2 3) '(4 5 6)) '(1 2 3 4 5 6))
-
 
 ;;; (list 1 2 3) => (1 2 3)
 (define list (lambda l l))
@@ -158,49 +183,40 @@
 
 ;;; (foldl f (t_1 t_2 ... t_n) base) => f(t_1, f(t_2, (f(..., f(t_n, base)))))
 (define foldl
-  (lambda (f l base)
-    (if (null? l)
+  (lambda (f xs base)
+    (if (null? xs)
         base
-        (f (car l) (foldl f (cdr l) base)))))   
+        (f (car xs) (foldl f (cdr xs) base)))))   
 
-;;; (+ t_1 t_2 ... t_n) => t_1 + t_2 + ... t_n
+;;; (+ x1 x2 ... xn) => x1 + x2 + ... + xn
 (define +
-  (lambda l
-    (foldl plus l 0)))
+  (lambda xs
+    (foldl plus xs 0)))
 
 ;;; I'm adapting MIT-Scheme's behaviour here: (-) => error
 ;;; (- 3) => -3, (- 10 1) => 9, (- 10 1 2) => 7
-
 (define -
-  (lambda l
-    (if (eq? (length l) 0)
-        (begin
-          (display "error: - requires at least one argument\n")
-          (exit))
-        (if (eq? (length l) 1)
-            (minus 0 (car l))
-            (minus (car l) (foldl plus (cdr l) 0))))))
+  (lambda xs
+    (cond ((null? xs) (error "- requires at least one argument\n"))
+          ((null? (cdr xs)) (minus 0 (car xs)))
+          (#t (minus (car xs) (foldl plus (cdr xs) 0))))))
 
 (assert (- 3) -3)
 (assert (- -3) 3)
 (assert (- 10 1) 9)
 (assert (- 10 1 2) 7)
 
-;;; (* t_1 t_2 ... t_n) => t_1 * t_2 * ... t_n
+;;; (* x1 x2 ... xn) => x1 * x2 * ... xn
 (define *
-  (lambda l
-    (foldl times l 1)))
+  (lambda xs
+    (foldl times xs 1)))
 
-;;; / is pretty much like minus 
+;;; / is pretty much like minus
 (define /
-  (lambda l
-    (if (eq? (length l) 0)
-        (begin
-          (display "error: / requires at least one argument\n")
-          (exit))
-        (if (eq? (length l) 1)
-            (div 1 (car l))
-            (div (car l) (foldl times (cdr l) 1))))))
+  (lambda xs
+    (cond ((null? xs) (error "/ requires at least one argument\n"))
+          ((null? (cdr xs)) (div 1 (car xs)))
+          (#t (div (car xs) (foldl times (cdr xs) 1))))))
 
 (assert (+ 1 2 3 4 5 6 7 8 9 10) 55)
 (assert (+ 3) 3)
@@ -273,6 +289,13 @@
 (assert (equal? '(1 (2 3)) '(1 (2 3))) #t)
 (assert (equal? '((1 2) 3) '(1 (2 3))) #f)
 
+(define range
+  (lambda (x y)
+    (when (< x y)
+      (cons x (range (+ x 1) y)))))
+
+(assert (range 1 5) '(1 2 3 4))
+
 (define map
   (lambda (f l)
     (if (null? l)
@@ -280,8 +303,18 @@
         (cons (f (car l)) (map f (cdr l))))))
 
 (assert (map abs '(-3 1 -4)) '(3 1 4))
-
 (assert (map zero? '(0 1 2)) '(#t #f #f))
+
+;;; (print x1 x2 ...) -- display all xi
+(define print
+  (lambda xs
+    (map display xs)))
+
+;;; (error x1 x2 ...) -- display all x1, then exit
+(define error
+  (lambda xs
+    (map display xs)
+    (exit)))
 
 ;;; a mod b = a - b*int(a/b)
 (define mod
