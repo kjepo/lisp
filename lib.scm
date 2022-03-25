@@ -218,23 +218,6 @@
   *seed*)
 
 ;;; some basic sanity checking of built-in and defined functions
-(assert (and) #t)
-(assert (and #t) #t)
-(assert (and #f) #f)
-(assert (and #t #t) #t)
-(assert (and #f #t) #f)
-(assert (and #t #f) #f)
-(assert (and #f #f) #f)
-(assert (and #f (display "and: oops, this shouldn't happen\n")) #f)
-
-(assert (or) #f)
-(assert (or #t) #t)
-(assert (or #f) #f)
-(assert (or #t #t) #t)
-(assert (or #f #t) #t)
-(assert (or #t #f) #t)
-(assert (or #f #f) #f)
-(assert (or #t (display "or: oops, this shouldn't happen\n")) #t)
 
 (assert (< 2 3) #t)
 (assert (<= 2 3) #t)
