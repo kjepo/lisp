@@ -117,23 +117,6 @@
     (print x " " y "\n")
     (exit)))
 
-(assert (and) #t)
-(assert (and #t) #t)
-(assert (and #f) #f)
-(assert (and #t #t) #t)
-(assert (and #f #t) #f)
-(assert (and #t #f) #f)
-(assert (and #f #f) #f)
-(assert (and #f (display "and: oops, this shouldn't happen\n")) #f)
-
-(assert (or) #f)
-(assert (or #t) #t)
-(assert (or #f) #f)
-(assert (or #t #t) #t)
-(assert (or #f #t) #t)
-(assert (or #t #f) #t)
-(assert (or #f #f) #f)
-(assert (or #t (display "or: oops, this shouldn't happen\n")) #t)
 
 (define (>= x y)
     (or (> x y) (eq? x y)))
@@ -141,28 +124,7 @@
 (define (<= x y)
     (or (< x y) (eq? x y)))
 
-;;; some basic sanity checking of built-in functions
-(assert (< 2 3) #t)
-(assert (<= 2 3) #t)
-(assert (<= 3 3) #t)
-(assert (< 3 3) #f)
-(assert (> 3 2) #t)
-(assert (>= 3 2) #t)
-(assert (>= 3 3) #t)
-(assert (> 3 3) #f)
 
-(assert (car (cons 1 2)) 1)
-(assert (cdr (cons 1 2)) 2)
-(assert (number? 1) #t)
-(assert (number? 'a) #f)
-(assert (number? '(1 2 3)) #f)
-(assert (symbol? 1) #f)
-(assert (symbol? 'a) #t)
-(assert (symbol? '(1 2 3)) #f)
-(assert (plus (times 3 (plus (times 2 4) (plus 3 5))) (plus (minus 10 7) 6)) 57)
-
-;;; (assert (minus 0 1) -1)
- 
 ;;; append two lists
 (define (append x y)
   (if (null? x) y
@@ -184,7 +146,6 @@
       0
       (plus 1 (length (cdr l)))))
 
-(assert (length '(1 2 3)) 3)
 
 ;;; (+ x1 x2 ... xn) ==> x1 + x2 + ... + xn
 (define +
@@ -199,10 +160,6 @@
           ((null? (cdr xs)) (minus 0 (car xs)))
           (#t (minus (car xs) (foldl plus (cdr xs) 0))))))
 
-(assert (- 3) -3)
-(assert (- -3) 3)
-(assert (- 10 1) 9)
-(assert (- 10 1 2) 7)
 
 ;;; (* x1 x2 ... xn) ==> x1 * x2 * ... xn
 (define *
@@ -216,39 +173,10 @@
           ((null? (cdr xs)) (div 1 (car xs)))
           (#t (div (car xs) (foldl times (cdr xs) 1))))))
 
-(assert (+ 1 2 3 4 5 6 7 8 9 10) 55)
-(assert (+ 3) 3)
-(assert (+) 0)
-(assert (* 1 2 3) 6)
-(assert (*) 1)
-(assert (* 3) 3)
-(assert (- 10 1 2) 7)
-
-(assert (and) #t)
-(assert (and #f) #f)
-(assert (and #t) #t)
-(assert (and #f (display "error in and: this should not be seen\n")) #f)
-(assert (and #t #t #t) #t)
-(assert (and #t #t #f) #f)
-(assert (and #t #f #t) #f)
-(assert (and #f #t #t) #f)
-(assert (and #f #f #f) #f)
-(assert (or) #f)
-(assert (or #f) #f)
-(assert (or #t) #t)
-(assert (or #t (display "error in or: this should not be seen\n")) #t)
-(assert (or #t #t #t) #t)
-(assert (or #t #t #f) #t)
-(assert (or #t #f #t) #t)
-(assert (or #f #t #t) #t)
-(assert (or #f #f #f) #f)
 
 ;;; (zero? n) ==> #t if n is zero, #f otherwise
 (define (zero? n)
     (eq? n 0))
-
-(assert (zero? 0) #t)
-(assert (zero? 17) #f)
 
 ;;; (abs n) ==> absolute value of n
 (define (abs n)
@@ -256,41 +184,20 @@
         ((> n 0) n)
         (#t 0)))
 
-(assert (abs -3) 3)
-(assert (abs 3) 3)
-(assert (abs 0) 0)
-
 ;;; (-1+ n) ==> (- n 1)
 (define (-1+ n)
   (- n 1))
 
-(assert (-1+ 3) 2)
 
 (define (abs n)
   (if (< n 0)
       (- n)
       n))
 
-(assert (equal? 'a 'a) #t)
-(assert (equal? 'a 'b) #f)
-(assert (equal? 3 3) #t)
-(assert (equal? 3 5) #f)
-(assert (equal? '(1 2) '(1 2)) #t)
-(assert (equal? '(1 2) '(2 1)) #f)
-(assert (equal? '(1 2) '(1 (2))) #f)
-(assert (equal? '(1 2) '(1)) #f)
-(assert (equal? '(1) '(1 2)) #f)
-(assert (equal? '(1 (2 3)) '(1 (2 3))) #t)
-(assert (equal? '((1 2) 3) '(1 (2 3))) #f)
 
 (define (range x y)
   (when (< x y)
     (cons x (range (+ x 1) y))))
-
-(assert (range 1 5) '(1 2 3 4))
-
-(assert (map abs '(-3 1 -4)) '(3 1 4))
-(assert (map zero? '(0 1 2)) '(#t #f #f))
 
 ;;; (error x1 x2 ...) -- display all x1, then exit
 (define error
@@ -309,5 +216,109 @@
 (define (random)
   (set! *seed* (mod (+ (* 75 *seed*) 74) 65537))
   *seed*)
+
+;;; some basic sanity checking of built-in and defined functions
+(assert (and) #t)
+(assert (and #t) #t)
+(assert (and #f) #f)
+(assert (and #t #t) #t)
+(assert (and #f #t) #f)
+(assert (and #t #f) #f)
+(assert (and #f #f) #f)
+(assert (and #f (display "and: oops, this shouldn't happen\n")) #f)
+
+(assert (or) #f)
+(assert (or #t) #t)
+(assert (or #f) #f)
+(assert (or #t #t) #t)
+(assert (or #f #t) #t)
+(assert (or #t #f) #t)
+(assert (or #f #f) #f)
+(assert (or #t (display "or: oops, this shouldn't happen\n")) #t)
+
+(assert (< 2 3) #t)
+(assert (<= 2 3) #t)
+(assert (<= 3 3) #t)
+(assert (< 3 3) #f)
+(assert (> 3 2) #t)
+(assert (>= 3 2) #t)
+(assert (>= 3 3) #t)
+(assert (> 3 3) #f)
+
+(assert (car (cons 1 2)) 1)
+(assert (cdr (cons 1 2)) 2)
+
+(assert (number? 1) #t)
+(assert (number? 'a) #f)
+(assert (number? '(1 2 3)) #f)
+
+(assert (symbol? 1) #f)
+(assert (symbol? 'a) #t)
+(assert (symbol? '(1 2 3)) #f)
+
+(assert (plus (times 3 (plus (times 2 4) (plus 3 5))) (plus (minus 10 7) 6)) 57)
+(assert (minus 0 1) -1)
+
+(assert (length '(1 2 3)) 3)
+(assert (- 3) -3)
+(assert (- -3) 3)
+(assert (- 10 1) 9)
+(assert (- 10 1 2) 7)
+
+(assert (+ 1 2 3 4 5 6 7 8 9 10) 55)
+(assert (+ 3) 3)
+(assert (+) 0)
+(assert (* 1 2 3) 6)
+(assert (*) 1)
+(assert (* 3) 3)
+(assert (- 10 1 2) 7)
+
+(assert (and) #t)
+(assert (and #f) #f)
+(assert (and #t) #t)
+(assert (and #f (display "error in and: this should not be seen\n")) #f)
+(assert (and #t #t #t) #t)
+(assert (and #t #t #f) #f)
+(assert (and #t #f #t) #f)
+(assert (and #f #t #t) #f)
+(assert (and #f #f #f) #f)
+
+(assert (or) #f)
+(assert (or #f) #f)
+(assert (or #t) #t)
+(assert (or #t (display "error in or: this should not be seen\n")) #t)
+(assert (or #t #t #t) #t)
+(assert (or #t #t #f) #t)
+(assert (or #t #f #t) #t)
+(assert (or #f #t #t) #t)
+(assert (or #f #f #f) #f)
+
+(assert (zero? 0) #t)
+(assert (zero? 17) #f)
+
+(assert (abs -3) 3)
+(assert (abs 3) 3)
+(assert (abs 0) 0)
+
+(assert (-1+ 3) 2)
+
+(assert (equal? 'a 'a) #t)
+(assert (equal? 'a 'b) #f)
+(assert (equal? 3 3) #t)
+(assert (equal? 3 5) #f)
+(assert (equal? '(1 2) '(1 2)) #t)
+(assert (equal? '(1 2) '(2 1)) #f)
+(assert (equal? '(1 2) '(1 (2))) #f)
+(assert (equal? '(1 2) '(1)) #f)
+(assert (equal? '(1) '(1 2)) #f)
+(assert (equal? '(1 (2 3)) '(1 (2 3))) #t)
+(assert (equal? '((1 2) 3) '(1 (2 3))) #f)
+
+(assert (range 1 5) '(1 2 3 4))
+
+(assert (map abs '(-3 1 -4)) '(3 1 4))
+(assert (map zero? '(0 1 2)) '(#t #f #f))
+
+(assert (random) 74)
 
 (display "lib.scm loaded\n")
