@@ -505,8 +505,15 @@ void eval() {			// evaluate expr in env
     case EV_DEFINITION:
       display_registers("EV_DEFINITION");
       unev = cadr(expr);
-      push(unev);
-      expr = caddr(expr);
+      if (is_pair(unev)) {        // (define (name x1 x2 ...) body)
+        unev = caadr(expr);       // name
+        push(unev);
+        gc_need(2);
+        expr = cons(LAMBDA_SYM, cons(cdadr(expr), cddr(expr)));
+      } else {                    // (define name expr)
+        push(unev);
+        expr = caddr(expr);       // expr
+      }
       push(env);
       push(cont);
       cont = mknum(EV_DEFINITION_1);

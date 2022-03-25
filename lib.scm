@@ -7,7 +7,7 @@
   (lambda ()
     (display "\n")))
 
-;;; (not x) ==> #f if x evaluates to #t, #t otherwise
+;;; (not x) -- negate x
 (define not
   (lambda (x)
     (if x #f #t)))
@@ -49,6 +49,28 @@
         (if (eval (caar body) env)
             (eval (cadar body) env)
             (cond$ (cdr body) env)))))
+
+;;; (let ((v1 e1) (v2 e2) ...))
+
+
+;;; (defun (foo x1 x2 ...) body) ==> (define foo (lambda (x1 x2 ...) body))
+
+(define defun
+  (nlambda body
+    (defun* body $env)))
+
+(define defun*
+  (lambda (body env)
+    (display (caar body))
+    (define (caar body)
+      (eval (list 'lambda (cdar body) (cons 'begin (cdr body)))))))
+
+;
+;    (eval
+;     (list 'define
+;           (caar body)
+;           (list 'lambda (cdar body) (cons 'begin (cdr body))))
+;     env)))
 
 ;;; (eval-sequence xs env) -- evaluate all x in xs, in environment env
 (define eval-sequence
