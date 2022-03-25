@@ -49,11 +49,11 @@
          (make-sum (deriv (addend exp) var)
                    (deriv (augend exp) var)))
         ((product? exp)
-		     (make-sum
-		      (make-product (multiplier exp)
-				                (deriv (multiplicand exp) var))
-		      (make-product (deriv (multiplier exp) var)
-				                (multiplicand exp))))
+         (make-sum
+          (make-product (multiplier exp)
+                        (deriv (multiplicand exp) var))
+          (make-product (deriv (multiplier exp) var)
+                        (multiplicand exp))))
         (#t (error "unknown expression type: " exp))))
 
 (print "(+ x 3) => " (deriv '(+ x 3) 'x) "\n")
