@@ -30,6 +30,9 @@
 (define first (lambda (l) (car l)))
 (define rest  (lambda (l) (cdr l)))
 
+;;; (list 1 2 3) ==> (1 2 3)
+(define list (lambda l l))
+
 ;;; (print x1 x2 ...) -- display all xi
 (define print
   (lambda xs
@@ -74,7 +77,18 @@
           (eval (cadar body) env)
           (cond$ (cdr body) env))))
 
-;;; (let ((v1 e1) (v2 e2) ...))
+;;; (let ((x 1)
+;;;       (y 2))
+;;;       (+ x y)) ==> ((lambda (x y) (+ x y)) 1 2)
+
+(define let
+  (nlambda body
+    (let$ (car body) (cdr body) $env)))
+
+(define (let$ initializers body env)
+  (eval
+   (cons (cons 'lambda (cons (map car initializers) body)) (map cadr initializers))
+   env))
 
 ;;; (eval-sequence xs env) -- evaluate all x in xs, in environment env
 (define (eval-sequence xs env)
@@ -132,9 +146,6 @@
 	          (append (cdr x) y))))
 
 (assert (append '(1 2 3) '(4 5 6)) '(1 2 3 4 5 6))
-
-;;; (list 1 2 3) ==> (1 2 3)
-(define list (lambda l l))
 
 (assert (car (list 1 2)) 1)
 (assert (car (cdr (list 1 2))) 2)
@@ -217,7 +228,9 @@
   (set! *seed* (mod (+ (* 75 *seed*) 74) 65537))
   *seed*)
 
-;;; some basic sanity checking of built-in and defined functions
+
+
+;;; Some basic sanity checking of built-in and defined functions
 
 (assert (< 2 3) #t)
 (assert (<= 2 3) #t)
@@ -275,6 +288,11 @@
 (assert (or #t #f #t) #t)
 (assert (or #f #t #t) #t)
 (assert (or #f #f #f) #f)
+
+(assert
+ (let ((x 1)
+       (y 2))
+   (plus x y)) 3)
 
 (assert (zero? 0) #t)
 (assert (zero? 17) #f)
