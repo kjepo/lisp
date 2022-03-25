@@ -82,7 +82,7 @@
         ((null? (cdr xs)) (eval (car xs) env))
         (#t (begin
               (eval (car xs) env)
-              (eval-sequence (cdr xs) env))))))
+              (eval-sequence (cdr xs) env)))))
 
 ;;; (when condition x1 x2 ...) ==> (if condition (begin x1 x2 ...))
 (define when
