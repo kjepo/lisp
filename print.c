@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <ctype.h>
+#include <math.h>
+#include <limits.h>
 #include <string.h>
 #include "lisp.h"
 #include "hashtab.h"
@@ -18,61 +20,57 @@ char *continuation_string[] = { "PRINT_RESULT", "EV_IF_DECIDE",
   "COMPOUND_APPLY", "MACRO_APPLY", "UNKNOWN_PROCEDURE_TYPE",
   "UNKNOWN_EXPRESSION_TYPE" };
 
+Obj BROKEN_HEART = MAKE_BROKEN(0);
+
+int is_integer(double f) { return f == trunc(f); }
+
 void display2(Obj expr, int dotted, int level) {
   if (level > 10) {
     printf("...");
     return;
   }
-  if (expr == BROKEN_TAG) {
-    printf("XXX");
-    return;
-  }
-  switch (objtype(expr)) {
-  case PAIR_TAG:
-    if (expr == NIL)
+
+  if (IS_SEXPR(expr)) {
+    if (is_nil(expr)) {
       printf("()");
-    else {
-      if (car(expr) == PROCEDURE_SYM) { 
+    } else {
+      if (EQ(car(expr), PROCEDURE_SYM)) { 
 	printf("<λ");
 	display2(cadr(expr), 0, level+1);
 	printf(".");
 	display2(caddr(expr), 0, level+1);
 	printf(">");
-	break;
       } if (!dotted)
 	printf("(");
       display2(car(expr), 0, level+1);
-      if (cdr(expr) != NIL) {
+      if (!is_nil(cdr(expr))) {
 	printf(" ");
-	if (objtype(cdr(expr)) != PAIR_TAG)
+	if (!IS_SEXPR(cdr(expr)))
 	  printf(". ");
 	display2(cdr(expr), 1, level+1);
       }
       if (!dotted)
 	printf(")");
     }
-    break;
-  case SYMBOL_TAG:
-  case STR_TAG:
-    printf("%s", find(objval(expr)));
-    break;
-  case NUM_TAG:
-    printf("%d", objval(expr));
-    break;
-  case BROKEN_TAG:
-    printf("XXX ");
-    break;
-  case PRIM_TAG:
-    printf("<primitive #%d>", objval(expr));
-    break;
-  case BOOL_TAG:
-    printf("%s", (expr == False ? "#f" : "#t"));
-    break;
-  case ARRAY_TAG:
+  } else if (IS_SYMBOL(expr) || IS_STR(expr)) {
+    printf("%s", find(NAN_VALUE(expr)));
+  } else if (IS_BROKEN(expr)) {
+    printf("BBBB (%llx)", NAN_VALUE(expr));
+  } else if (IS_PRIM(expr)) {
+    printf("<primitive #%lld>", NAN_VALUE(expr));
+  } else if (IS_ARRAY(expr)) {
     printf("<array>");
-    break;
-  default:
-    fprintf(stderr, "display2: can't happen: %d\n", objtype(expr));
+  } else if (IS_DOUBLE(expr)) {
+    double x = DOUBLEVALUE(expr);
+    if (is_integer(x)) {
+      if (fabs(x) < INT_MAX)
+	printf("%.0f", x);	/* show as e.g. 62 */
+      else
+	printf("%e", x);	/* show as e.g. 3.14e12 */
+    } else
+      printf("%f", x);		/* show as e.g. 3.14 */
+  } else {
+    fprintf(stderr, "display2: can't happen: %llx\n", expr.as_int);
     exit(1);
   }
 }
@@ -87,7 +85,7 @@ void display_registers(char *where) {
   printf("===============================%s (%d)=\n", where, label);
   printf("expr: "); display(expr); NL;
   printf("env:  "); display(env); NL;
-  printf("cont: "); printf("%s\n", continuation_string[objval(cont)]);
+  printf("cont: "); printf("%s\n", continuation_string[NAN_VALUE(cont)]);
   printf("val:  "); display(val); NL;
   printf("unev: "); display(unev); NL;
   printf("argl: "); display(argl); NL;
@@ -97,32 +95,16 @@ void display_registers(char *where) {
 }
 
 void dumpval(Obj n) {
-  if (n == BROKEN_TAG) {
-    printf("XXX ");
-    return;
-  }
-  switch (objtype(n)) {
-  case PAIR_TAG:
-    if (objval(n))
-      printf("P%d ", objval(n));
-    else
-      printf("   ");
-    break;
-  case NUM_TAG:
-    printf("INT %d ", objval(n));
-    break;
-  case SYMBOL_TAG:
-    printf("%s ", find(objval(n)));
-    break;
-  case BROKEN_TAG:
-    printf("$%d ", objval(n));
-    break;
-  case PRIM_TAG:
-    printf("prim%d ", objval(n));
-    break;
-  default:
-    printf("?%d ", objval(n));
-    break;
+  if (IS_SEXPR(n)) {
+    printf("P%lld ", NAN_VALUE(n));
+  } else if (IS_SYMBOL(n)) {
+    printf("%s ", find(NAN_VALUE(n)));
+  } else if (IS_BROKEN(n)) {
+    printf("$%lld ", NAN_VALUE(n));
+  } else if (IS_PRIM(n)) {
+    printf("prim%lld ", NAN_VALUE(n));
+  } else {
+    printf("?%llx ", NAN_VALUE(n));
   }
 }
 
@@ -148,35 +130,28 @@ void dump_memory2(int from, int to, Obj *cars, Obj *cdrs, char *carstr, char *cd
 
 char *cellname(Obj p) {
   char *name = malloc(80);
-  if (p == 0)
+  if (is_nil(p))
     return "-";
-  switch (objtype(p)) {
-  case PAIR_TAG:
-    sprintf(name, "P%d", objval(p));
+  if (IS_SEXPR(p)) {
+    sprintf(name, "P%lld", NAN_VALUE(p));
     return name;
-  case SYMBOL_TAG:
-    sprintf(name, "%s", find(objval(p)));
+  } else if (IS_SYMBOL(p)) {
+    sprintf(name, "%s", find(NAN_VALUE(p)));
     if (name[0] == '<')
       return "\\<";
     else if (name[0] == '>')
       return "\\>";
     return name;
-  case BOOL_TAG:
-    sprintf(name, "%s", objval(p) == False ? "#f" : "#t");
+  } else if (IS_STR(p)) {
+    sprintf(name, "\"%s\"", find(NAN_VALUE(p)));
     return name;
-  case STR_TAG:
-    sprintf(name, "\"%s\"", find(objval(p)));
+  } else if (IS_BROKEN(p)) {
+    sprintf(name, "proc %lld", NAN_VALUE(p));
     return name;
-  case NUM_TAG:
-    sprintf(name, "int %d", objval(p));
+  } else if (IS_PRIM(p)) {
+    sprintf(name, "prim %lld ", NAN_VALUE(p));
     return name;
-  case BROKEN_TAG:
-    sprintf(name, "proc %d", objval(p));
-    return name;
-  case PRIM_TAG:
-    sprintf(name, "prim %d ", objval(p));
-    return name;
-  default:
+  } else {
     return "?";
   }
 }
@@ -216,24 +191,24 @@ void mkgraph() {
   fprintf(fp, "\n");
   for (i = 0; i < free_index; i++) {
     if (is_pair(thecars[i]) || is_compound(thecars[i]))
-      fprintf(fp, "%d:car -> %d:car\n", i, objval(thecars[i]));
+      fprintf(fp, "%d:car -> %llu:car\n", i, NAN_VALUE(thecars[i]));
     if (is_pair(thecdrs[i]) || is_compound(thecdrs[i]))
-      fprintf(fp, "%d:cdr -> %d:car\n", i, objval(thecdrs[i]));
+      fprintf(fp, "%d:cdr -> %llu:car\n", i, NAN_VALUE(thecdrs[i]));
   }
 
-  fprintf(fp, "env -> %d:car\n", objval(env));
-  fprintf(fp, "val -> %d:car\n", objval(val));
-  fprintf(fp, "unev -> %d:car\n", objval(unev));
-  fprintf(fp, "argl -> %d:car\n", objval(argl));
-  fprintf(fp, "proc -> %d:car\n", objval(proc));
-  fprintf(fp, "expr -> %d:car\n", objval(expr));
-  fprintf(fp, "prim_proc -> %d:car\n", objval(prim_proc));
-  fprintf(fp, "stack -> %d:car\n", objval(stack));
-  fprintf(fp, "conscell -> %d:car\n", objval(conscell));
-  fprintf(fp, "cont -> %d:car\n", objval(cont));
-  fprintf(fp, "tmp1 -> %d:car\n", objval(tmp1));
-  fprintf(fp, "tmp2 -> %d:car\n", objval(tmp2));
-  fprintf(fp, "tmp3 -> %d:car\n", objval(tmp3));
+  fprintf(fp, "env -> %llud:car\n", NAN_VALUE(env));
+  fprintf(fp, "val -> %llud:car\n", NAN_VALUE(val));
+  fprintf(fp, "unev -> %llud:car\n", NAN_VALUE(unev));
+  fprintf(fp, "argl -> %llud:car\n", NAN_VALUE(argl));
+  fprintf(fp, "proc -> %llud:car\n", NAN_VALUE(proc));
+  fprintf(fp, "expr -> %llud:car\n", NAN_VALUE(expr));
+  fprintf(fp, "prim_proc -> %llud:car\n", NAN_VALUE(prim_proc));
+  fprintf(fp, "stack -> %llud:car\n", NAN_VALUE(stack));
+  fprintf(fp, "conscell -> %llud:car\n", NAN_VALUE(conscell));
+  fprintf(fp, "cont -> %llud:car\n", NAN_VALUE(cont));
+  fprintf(fp, "tmp1 -> %llud:car\n", NAN_VALUE(tmp1));
+  fprintf(fp, "tmp2 -> %llud:car\n", NAN_VALUE(tmp2));
+  fprintf(fp, "tmp3 -> %llud:car\n", NAN_VALUE(tmp3));
   fprintf(fp, "}\n");
   fclose(fp);
 }
@@ -242,10 +217,10 @@ int min(int x, int y) { return x < y ? x : y; }
 
 void dump_memory() {
   mkgraph();
-  printf("MEMORY==> env = %d, prim_proc = %d free_index = %d\n", objval(env), objval(prim_proc), free_index);
+  printf("MEMORY==> env = %llu, prim_proc = %llu free_index = %d\n", NAN_VALUE(env), NAN_VALUE(prim_proc), free_index);
   int i, last;
   for (last = MEMSIZE; last >= 0; last--)
-    if (thecars[last])
+    if (!is_nil(thecars[last]))
       break;
   for (i = 0; i < last+11; i+= 12) {
     if (i < MEMSIZE) {

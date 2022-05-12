@@ -11,6 +11,9 @@
 #include <setjmp.h>
 #include <signal.h>
 #include <unistd.h>
+#include <ctype.h>
+#include <math.h>
+#include <string.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <assert.h>
@@ -19,9 +22,12 @@
 #include "hashtab.h"
 #include "gc.h"
 
-Obj NIL=0, free_index=1, True, False, env, val, unev, argl, proc, expr, stack;
-Obj conscell, tmp1, tmp2, tmp3, prim_proc;
-Continuation cont, label;
+Obj NIL = MAKE_SEXPR(0);
+Obj parse_error = MAKE_SEXPR(-1);
+int free_index = 1;
+Obj True, False, env, val, unev, argl, proc, expr, stack;
+Obj conscell, tmp1, tmp2, tmp3, prim_proc, cont;
+Continuation label;
 
 int verbose = 0;
 char *fname;
@@ -36,33 +42,24 @@ void error(char *s)   {
   longjmp(jmpbuf, 1);
 }
 
-void INThandler(int sig) {
+void interrupt_handler(int sig) {
   char c;
   signal(sig, SIG_IGN);
   printf("Interrupt\n");
-  signal(SIGINT, INThandler);
+  signal(SIGINT, interrupt_handler);
   longjmp(jmpbuf, 1);
-}
-
-int objtype(Obj n) { return n & 7; }
-int objval(Obj n)  {
-  if (objtype(n) == NUM_TAG && (n & 0x80000000)) /* handle negative number */
-      return ((n >> 3) | 0xe0000000);
-  return n >> 3;
 }
 
 void unbound(Obj id) {
-  printf("Unbound variable %s at line %d, file %s\n",
-	 find(objval(id)), lineno, fname);
+  printf("Unbound variable %s at line %d, file %s\n", find(NAN_VALUE(id)), lineno, fname);
   longjmp(jmpbuf, 1);
 }
-
-Obj mkpointer(int p) { return ((p) << 3) | PAIR_TAG; }
 
 Obj cons(Obj car_, Obj cdr_) {
   thecars[free_index] = car_;
   thecdrs[free_index] = cdr_;
-  conscell = mkpointer(free_index);
+  Obj konscell =  MAKE_SEXPR(free_index);
+  conscell = konscell;
   if (++free_index >= MEMSIZE && gc()) {
     fprintf(stderr, "Sorry - memory is full, even after GC\n");
     exit(1);
@@ -71,20 +68,19 @@ Obj cons(Obj car_, Obj cdr_) {
 }
 
 typedef enum {
-  PRIM_CAR, PRIM_CDR, PRIM_CONS, PRIM_PAIRP, PRIM_PLUS, PRIM_MINUS, PRIM_TIMES,
-  PRIM_DIV, PRIM_EQ, PRIM_EQP, PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_NUMBERP,
-  PRIM_SYMBOLP, PRIM_NULLP, PRIM_EXIT, PRIM_FILE, PRIM_EVAL } Primitive;
+  PRIM_CAR, PRIM_CDR, PRIM_CONS, PRIM_PAIRP, PRIM_PLUS, PRIM_MINUS, PRIM_TIMES, PRIM_DIV,
+  PRIM_EQP, PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_TRUNCATE, PRIM_NUMBERP, PRIM_SYMBOLP,
+  PRIM_STRINGP, PRIM_BOOLEANP, PRIM_NULLP, PRIM_EXIT, PRIM_FILE, PRIM_EVAL } Primitive;
 
-Obj mknum(int n) { return (n << 3) | NUM_TAG; }
-Obj mkstr(char *str) { return ((lookup(str)) << 3) | STR_TAG; }
-Obj mksym(char *id) { return ((lookup(id)) << 3) | SYMBOL_TAG; }
-Obj mkbool(char *id) { return ((lookup(id)) << 3) | BOOL_TAG; }
-Obj mkprim(Primitive p) { return (p << 3) | PRIM_TAG; }
+Obj mksym(char *id) { Obj sym = MAKE_SYMBOL(lookup(id)); return sym; }
+Obj mknum(double n) { Obj num = MAKE_DOUBLE(n); return num; }
+Obj mkstr(char *str) { Obj s = MAKE_STR(lookup(str)); return s; }
+Obj mkprim(int n) { Obj prim = MAKE_PRIM(n); return prim; }
 
 void push(Obj x) { stack = cons(x, stack); }
 
 Obj pop() {
-  if (stack == NIL) {
+  if (EQ(stack, NIL)) {
     error("Stack underflow!");
     return NIL; 		/* not reached */
   } else {
@@ -109,7 +105,7 @@ Obj mkproc(Obj parameters, Obj body, Obj env) {
   return cons(PROCEDURE_SYM, cons(parameters, cons(body, cons(env, NIL))));
 }
 
-// a macro is a triple (MACRO parameters body), env is not used
+// a macro is a triple (MACRO parameters body) - env is not used
 Obj mkmacro(Obj parameters, Obj body) {
   tmp2 = body;  tmp3 = parameters;
   gc_need(5);
@@ -120,9 +116,9 @@ Obj mkmacro(Obj parameters, Obj body) {
 // destructive append, sets the cdr of l to m (unless l is NIL of course)
 Obj concat(Obj l, Obj m) {
   Obj head = l;
-  if (l == NIL)
+  if (EQ(l, NIL))
     return m;
-  while (cdr(l) != NIL)
+  while (!EQ(cdr(l), NIL))
     l = cdr(l);
   cdr(l) = m;
   return head;
@@ -137,7 +133,7 @@ Obj adjoin_arg(Obj arg, Obj arglist) {
 
 int length(Obj p) {
   int n = 0;
-  while (p != NIL) {
+  while (!EQ(p, NIL)) {
     p = cdr(p);
     n++;
   }
@@ -145,14 +141,14 @@ int length(Obj p) {
 }
 
 Obj pairup_aux(Obj vars, Obj vals) {
-  if (vars == NIL)
+  if (EQ(vars, NIL))
     return NIL;
   else
     return cons(cons(car(vars), car(vals)), pairup_aux(cdr(vars), cdr(vals)));
 }
 
 Obj pairup(Obj vars, Obj vals) {
-  if (vars == NIL)
+  if (EQ(vars, NIL))
     return NIL;
   int n = length(vars);
   int m = length(vals);
@@ -169,13 +165,13 @@ Obj pairup(Obj vars, Obj vals) {
 }
 
 Obj bind(Obj vars, Obj vals, Obj environment) {
-  if (objtype(vars) != PAIR_TAG) { // ((lambda l body) '(1 2 3)) => l/'(1 2 3)
+  if (!IS_SEXPR(vars)) {        // ((lambda l body) '(1 2 3)) => l/'(1 2 3)
     tmp3 = environment;
     tmp1 = cons(vars, NIL);
     tmp2 = cons(vals, NIL);
     tmp2 = pairup(tmp1, tmp2);
     return concat(tmp2, tmp3);
-  } else {   // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3
+  } else {        // ((lambda (x y z) body) '(1 2 3)) => bind x/1, y/2, z/3
     tmp3 = environment;
     tmp1 = pairup(vars, vals);	// <--- uses tmp1 and tmp2
     environment = tmp3;
@@ -201,9 +197,11 @@ void add_binding(Obj var, Obj val, Obj env) {
 
 // find the first pair in env whose car equals var and return that pair
 Obj assoc(Obj var, Obj env) {
-  if (env == NIL)
+  if (EQ(env, NIL))
     return NIL;
-  else if (car(car(env)) == var)
+  else if (EQ(car(env), NIL))
+    return NIL;
+  else if (EQ(car(car(env)), var))
     return car(env);
   else
     return assoc(var, cdr(env));
@@ -211,7 +209,7 @@ Obj assoc(Obj var, Obj env) {
 
 Obj env_lookup(Obj var, Obj env) {      // env[var]
   Obj pair = assoc(var, env);
-  if (pair == NIL) {
+  if (EQ(pair, NIL)) {
     unbound(var);
     return NIL;
   } else
@@ -220,7 +218,7 @@ Obj env_lookup(Obj var, Obj env) {      // env[var]
 
 void set_variable_value(Obj var, Obj val, Obj env) {
   Obj pair = assoc(var, env);
-  if (pair == NIL)
+  if (EQ(pair, NIL))
     unbound(var);
   else
     cdr(pair) = val;
@@ -228,14 +226,14 @@ void set_variable_value(Obj var, Obj val, Obj env) {
 
 void define_variable(Obj var, Obj val, Obj env) {
   Obj pair = assoc(var, env);
-  if (pair != NIL)
+  if (!EQ(pair, NIL))
     cdr(pair) = val;            // overwrite old definition
   else
     add_binding(var, val, env);
 }
 
 void init_symbols() {
-  False = mkbool("#f");  True = mkbool("#t");
+  False = mksym("#f"); True = mksym("#t");
   IF_SYM = mksym("if");  EQ_SYM = mksym("eq");  ADD_SYM = mksym("add");
   SUB_SYM = mksym("sub");  MUL_SYM = mksym("mul");  DIV_SYM = mksym("div");
   CAR_SYM = mksym("car");  CDR_SYM = mksym("cdr");  CONS_SYM = mksym("cons");
@@ -245,7 +243,6 @@ void init_symbols() {
   PROCEDURE_SYM = mksym("procedure");  MACRO_SYM = mksym("macro");
   val = unev = argl = proc = stack = NIL;
   cont = mknum(EVAL_DISPATCH);
-  srandom(getpid());
 }
 
 void init_env() {
@@ -263,12 +260,14 @@ void init_env() {
   add_binding(mksym("minus"), mkprim(PRIM_MINUS), prim_proc);
   add_binding(mksym("times"), mkprim(PRIM_TIMES), prim_proc);
   add_binding(mksym("div"), mkprim(PRIM_DIV), prim_proc);
-  add_binding(mksym("=="), mkprim(PRIM_EQ), prim_proc);  // ??
   add_binding(mksym("eq?"), mkprim(PRIM_EQP), prim_proc);
   add_binding(mksym("<"), mkprim(PRIM_LT), prim_proc);
   add_binding(mksym(">"), mkprim(PRIM_GT), prim_proc);
+  add_binding(mksym("truncate"), mkprim(PRIM_TRUNCATE), prim_proc);
   add_binding(mksym("number?"), mkprim(PRIM_NUMBERP), prim_proc);
   add_binding(mksym("symbol?"), mkprim(PRIM_SYMBOLP), prim_proc);
+  add_binding(mksym("string?"), mkprim(PRIM_STRINGP), prim_proc);
+  add_binding(mksym("boolean?"), mkprim(PRIM_BOOLEANP), prim_proc);
   add_binding(mksym("null?"), mkprim(PRIM_NULLP), prim_proc);
   add_binding(mksym("exit"), mkprim(PRIM_EXIT), prim_proc);
   add_binding(mksym("file"), mkprim(PRIM_FILE), prim_proc);
@@ -276,23 +275,19 @@ void init_env() {
   add_binding(mksym("current-environment"), prim_proc, prim_proc);
 }
 
-int is_num(Obj p)        { return NUM_TAG == objtype(p); }
-int is_str(Obj p)        { return STR_TAG == objtype(p); }
-int is_bool(Obj p)       { return BOOL_TAG == objtype(p); }
-int is_variable()        { return SYMBOL_TAG == objtype(expr); }
-int is_primitive(Obj p)  { return PRIM_TAG == objtype(p); }
-int is_compound(Obj p)   { return is_pair(p) && PROCEDURE_SYM == car(p); }
-int is_macro(Obj p)      { return is_pair(p) && MACRO_SYM == car(p); }
-int is_nil(Obj p)        { return p == NIL; }
-int is_pair(Obj p)       { return PAIR_TAG == objtype(p) && !is_nil(p); }
-int is_self_evaluating() { return is_nil(expr) || is_num(expr) || is_str(expr) || is_bool(expr); }
-int is_quote()           { return is_pair(expr) && QUOTE_SYM == car(expr); }
-int is_if()              { return is_pair(expr) && IF_SYM == car(expr); }
-int is_assignment()      { return is_pair(expr) && SETBANG_SYM == car(expr); }
-int is_definition()      { return is_pair(expr) && DEFINE_SYM == car(expr); }
-int is_lambda()          { return is_pair(expr) && LAMBDA_SYM == car(expr); }
-int is_nlambda()         { return is_pair(expr) && NLAMBDA_SYM == car(expr); }
-int is_begin()           { return is_pair(expr) && BEGIN_SYM == car(expr); }
+int is_variable()        { return IS_SYMBOL(expr); }
+int is_compound(Obj p)   { return is_pair(p) && EQ(PROCEDURE_SYM, car(p)); }
+int is_macro(Obj p)      { return is_pair(p) && EQ(MACRO_SYM, car(p)); }
+int is_nil(Obj p)        { return EQ(p, NIL); }
+int is_pair(Obj p)       { return IS_SEXPR(p) && !is_nil(p); }
+int is_self_evaluating() { return is_nil(expr) || IS_DOUBLE(expr) || IS_STR(expr); }
+int is_quote()           { return is_pair(expr) && EQ(QUOTE_SYM, car(expr)); }
+int is_if()              { return is_pair(expr) && EQ(IF_SYM, car(expr)); }
+int is_assignment()      { return is_pair(expr) && EQ(SETBANG_SYM, car(expr)); }
+int is_definition()      { return is_pair(expr) && EQ(DEFINE_SYM, car(expr)); }
+int is_lambda()          { return is_pair(expr) && EQ(LAMBDA_SYM, car(expr)); }
+int is_nlambda()         { return is_pair(expr) && EQ(NLAMBDA_SYM, car(expr)); }
+int is_begin()           { return is_pair(expr) && EQ(BEGIN_SYM, car(expr)); }
 int is_application()     { return is_pair(expr); }
 
 void checklist(Obj p, char *fcnname) {
@@ -304,9 +299,9 @@ void checklist(Obj p, char *fcnname) {
   longjmp(jmpbuf, 1);
 }
 
-int checknr(Obj p, char *opname) {
-  if (is_num(p))
-    return objval(p);
+double checknr(Obj p, char *opname) {
+  if (IS_DOUBLE(p))
+    return DOUBLEVALUE(p);
   printf("The object "); display(p);
   printf(" passed as an argument of %s, is not of the correct type.\n", opname);
   longjmp(jmpbuf, 1);
@@ -317,19 +312,27 @@ int checknr(Obj p, char *opname) {
 void prim_plus() { val = mknum(checknr(car(argl), "plus") + checknr(cadr(argl), "plus")); }
 void prim_minus() { val = mknum(checknr(car(argl), "minus") - checknr(cadr(argl), "minus")); }
 void prim_times() { val = mknum(checknr(car(argl), "times") * checknr(cadr(argl), "times")); }
-void prim_div() { val = mknum(checknr(car(argl), "times") / checknr(cadr(argl), "div")); }
-void prim_eq() { val = checknr(car(argl), "=") == checknr(cadr(argl), "=") ? True : False; }
+void prim_div() {
+  Obj q = MAKE_DOUBLE(checknr(car(argl), "div") / checknr(cadr(argl), "div"));
+  val = q;
+}
 void prim_lt() { val = checknr(car(argl), "<") < checknr(cadr(argl), "<") ? True : False; }
 void prim_gt() { val = checknr(car(argl), ">") > checknr(cadr(argl), ">") ? True : False; }
-void prim_eqp() { val = (objval(car(argl)) == objval(cadr(argl))) ? True : False; }
+void prim_eqp() {
+  Obj x1 = car(argl), x2 = cadr(argl);
+  val = x1.as_int == x2.as_int ? True : False;
+}
 void prim_car() { checklist(car(argl), "car"); val = car(car(argl)); }
 void prim_cdr() { checklist(car(argl), "cdr"); val = cdr(car(argl)); }
 void prim_cons() { val = cons(car(argl), cadr(argl)); }
 void prim_pairp() { val = is_pair(car(argl)) ? True : False; }
-void prim_nullp() { val = (car(argl) == NIL ? True : False); }
+void prim_nullp() { val = (is_nil(car(argl)) ? True : False); }
 void prim_display() { display2(car(argl), 0, -10000); }
-void prim_numberp() { val = (objtype(car(argl)) == NUM_TAG ? True : False); }
-void prim_symbolp() { val = (objtype(car(argl)) == SYMBOL_TAG ? True : False); }
+void prim_truncate() { val = mknum(trunc(checknr(car(argl), "truncate"))); }
+void prim_numberp() { val = IS_DOUBLE(car(argl)) ? True : False; }
+void prim_symbolp() { val = IS_SYMBOL(car(argl)) ? True : False; }
+void prim_stringp() { val = IS_STR(car(argl)) ? True : False; }
+void prim_booleanp() { val = (EQ(car(argl), True) || EQ(car(argl), False)) ? True : False; }
 void prim_exit() { longjmp(jmpbuf, 1); }
 void prim_file() { val = cons(mknum(lineno-1), cons(mkstr(fname), NIL)); }
 void eval();
@@ -337,11 +340,11 @@ void prim_eval() {
   push(expr);
   push(env);
   expr = car(argl);
-  if (cadr(argl) != NIL)        // use supplied 2nd argument for environment
+  if (length(argl) > 1)     // use supplied 2nd argument for environment
     env = cadr(argl);
   else {                        // if we're inside an nlambda, use $env
     Obj macroenv = assoc(mksym("$env"), env);
-    if (macroenv != NIL)
+    if (!is_nil(macroenv))
       env = macroenv;
   } 
   eval();
@@ -351,8 +354,8 @@ void prim_eval() {
 
 void (*primitives[])() = {
   prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times,
-  prim_div, prim_eq, prim_eqp, prim_lt, prim_gt, prim_display, prim_numberp,
-  prim_symbolp, prim_nullp, prim_exit, prim_file, prim_eval };
+  prim_div, prim_eqp, prim_lt, prim_gt, prim_display, prim_truncate, prim_numberp,
+  prim_symbolp, prim_stringp, prim_booleanp, prim_nullp, prim_exit, prim_file, prim_eval };
 
 void eval() {			// evaluate expr in env
   label = EVAL_DISPATCH;
@@ -362,8 +365,8 @@ void eval() {			// evaluate expr in env
     case EV_APPL_OPERAND_LOOP:
       display_registers("EV_APPL_OPERAND_LOOP");
       push(argl);
-      expr = car(unev);         /* 1st operand */
-      if (!cdr(unev)) {         /* last operand */
+      expr = car(unev);                /* 1st operand */
+      if (is_nil(cdr(unev))) {         /* last operand */
         label = EV_APPL_LAST_ARG;
       } else {
         push(env);
@@ -382,7 +385,7 @@ void eval() {			// evaluate expr in env
     case EV_SEQUENCE:
       display_registers("EV_SEQUENCE");
       expr = car(unev);         /* first expression */
-      if (!cdr(unev))           /* last expression */
+      if (is_nil(cdr(unev)))           /* last expression */
         label = EV_SEQUENCE_LAST_EXP;
       else {
         push(unev);
@@ -428,25 +431,24 @@ void eval() {			// evaluate expr in env
       argl = adjoin_arg(val, argl);
       proc = pop();
       label = APPLY_DISPATCH;
-      display_registers("EV_APPL_ACCUMULATE_LAST_ARG [2]");
       continue;
 
     case EV_SELF_EVAL:
       display_registers("EV_SELF_EVAL");
       val = expr;
-      label = objval(cont);
+      label = DOUBLEVALUE(cont);
       continue;
 
     case EV_VARIABLE:
       display_registers("EV_VARIABLE");
       val = env_lookup(expr, env);
-      label = objval(cont);
+      label = DOUBLEVALUE(cont);
       continue;
 
     case EV_QUOTED:
       display_registers("EV_QUOTED");
       val = cadr(expr);
-      label = objval(cont);
+      label = DOUBLEVALUE(cont);
       continue;
 
     case EV_IF:
@@ -464,7 +466,7 @@ void eval() {			// evaluate expr in env
       cont = pop();
       env = pop();
       expr = pop();
-      label = (val != False ? EV_IF_CONSEQUENT : EV_IF_ALTERNATIVE);
+      label = (!EQ(val, False) ? EV_IF_CONSEQUENT : EV_IF_ALTERNATIVE);
       continue;
 
     case EV_IF_CONSEQUENT:
@@ -475,7 +477,7 @@ void eval() {			// evaluate expr in env
 
     case EV_IF_ALTERNATIVE:
       display_registers("EV_IF_ALTERNATIVE");
-      if (cdddr(expr))
+      if (!is_nil(cdddr(expr)))
         expr = cadddr(expr);
       else
         expr = NIL;
@@ -499,7 +501,7 @@ void eval() {			// evaluate expr in env
       env = pop();
       unev = pop();
       set_variable_value(unev, val, env);
-      label = objval(cont);
+      label = DOUBLEVALUE(cont);
       continue;
 
     case EV_DEFINITION:
@@ -526,7 +528,7 @@ void eval() {			// evaluate expr in env
       env = pop();
       unev = pop();
       define_variable(unev, val, env);
-      label = objval(cont);
+      label = DOUBLEVALUE(cont);
       continue;
 
     case EV_LAMBDA:
@@ -534,7 +536,7 @@ void eval() {			// evaluate expr in env
       unev = cadr(expr);        // parameters
       expr = cddr(expr);        // body
       val = mkproc(unev, expr, env);
-      label = objval(cont);
+      label = DOUBLEVALUE(cont);
       continue;
 
     case EV_NLAMBDA:
@@ -542,7 +544,7 @@ void eval() {			// evaluate expr in env
       unev = cadr(expr);        // parameters
       expr = cddr(expr);        // body
       val = mkmacro(unev, expr);  // env is not used
-      label = objval(cont);
+      label = DOUBLEVALUE(cont);
       continue;
 
     case EV_BEGIN:
@@ -571,7 +573,7 @@ void eval() {			// evaluate expr in env
       proc = val;
       if (is_macro(proc))
         label = APPLY_DISPATCH; // macros don't evaluate arguments
-      else if (unev == NIL)
+      else if (is_nil(unev))
         label = APPLY_DISPATCH; // no arguments
       else {                    // evaluate arguments
         push(proc);
@@ -581,7 +583,7 @@ void eval() {			// evaluate expr in env
 
     case APPLY_DISPATCH:        // proc contains the evaluated operator
       display_registers("APPLY_DISPATCH");
-      if (is_primitive(proc))
+      if (IS_PRIM(proc))
         label = PRIMITIVE_APPLY;
       else if (is_compound(proc))
         label = COMPOUND_APPLY;
@@ -593,9 +595,9 @@ void eval() {			// evaluate expr in env
 
     case PRIMITIVE_APPLY:       // proc contains the evaluated operator
       display_registers("PRIMITIVE_APPLY");
-      primitives[objval(proc)]();
+      primitives[NAN_VALUE(proc)]();
       cont = pop();
-      label = objval(cont);
+      label = DOUBLEVALUE(cont);
       continue;
 
     case COMPOUND_APPLY:        // proc = (PROCEDURE parameters body env)
@@ -613,7 +615,6 @@ void eval() {			// evaluate expr in env
       add_binding(mksym("$env"), env, env);
       unev = caddr(proc);
       label = EV_SEQUENCE;
-      display_registers("MACRO_APPLY [2]");
       continue;
 
     case PRINT_RESULT:
@@ -665,7 +666,7 @@ typedef enum toktype {
 
 Token token;                    // current token
 char id[80];                    // string value when token == ID
-int nval;                       // numeric value when token == NUM
+double nval;                       // numeric value when token == NUM
 
 int legal_symbol_start(char ch) { return isalpha(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }
 int legal_symbol_rest(char ch)  { return isalnum(ch) || strchr("#+-.*/<=>!?:$%_&~^", ch); }
@@ -680,6 +681,7 @@ void cmd(char *line) {
     printf(":word ==> print word size\n");
     printf(":mem  ==> show free memory\n");
     printf(":gc   ==> force garbage collection\n");
+    printf(":sym  ==> print all symbols in hashtable\n");
   } else if (0 == strcmp(line, ":env")) {
     display(env); NL;
   } else if (0 == strcmp(line, ":word")) {
@@ -688,6 +690,8 @@ void cmd(char *line) {
     printf("%d/%d cells used\n", free_index, MEMSIZE);
   } else if (0 == strcmp(line, ":gc")) {
     gc();
+  } else if (0 == strcmp(line, ":sym")) {
+    dump_hashtab();
   } else
     printf("unknown command: %s\n", line);
 }
@@ -759,9 +763,11 @@ Token scan() {
       lastchar = ch;
     }
     error("unterminated string");
-  case LPAR:
+  case '(':
+  case '[':
     return token = LPAR;
-  case RPAR:
+  case ')':
+  case ']':
     return token = RPAR;
   case TICK:
     return token = TICK;
@@ -773,10 +779,10 @@ Token scan() {
     do {
       *p++ = ch;
       ch = nextchar();
-    } while (isdigit(ch));
+    } while (isdigit(ch) || ch == '.');
     *p = 0;
     input--;
-    sscanf(id, "%d", &nval);
+    sscanf(id, "%lf", &nval);
     return token = NUM;
   default:
     if (legal_symbol_start(ch) && ch != ' ') {
@@ -786,9 +792,10 @@ Token scan() {
         *p++ = ch;
       input--;
       *p = 0;
-      // a number is an optional + or - followed by at least one or more digits
-      // these are numbers: 1, -1, +1, -12 but these are not -, -1x, +, ++
-      if (sscanf(id, "%d%c", &nval, &cc) == 1 && cc == 0)
+      // a integer number is an optional + or - followed by at least one or more digits,
+      // with an optional fractional part.  These are numbers: 1, -1, +1, -12, -3.14
+      // but these are not -, -1x, +, ++, .1
+      if (sscanf(id, "%lf%c", &nval, &cc) == 1 && cc == 0)
         return token = NUM;
       return token = ID;
     } else {
@@ -806,7 +813,7 @@ Obj parse_atom() {
     return mkstr(id);
   } else {
     error("expected number or symbol.");
-    return -1;			/* unreachable */
+    return parse_error;			/* unreachable */
   }
 }
 
@@ -845,10 +852,10 @@ Obj parse() {
       return parse_seq();
   } else if (token == RPAR) {
     scan();
-    return -1;			/* tell REPL to ignore */
+    return parse_error;			/* tell REPL to ignore */
   } else {
     error("expected number, symbol, or '('.");
-    return -1;			/* tell REPL to ignore */
+    return parse_error;			/* tell REPL to ignore */
   }
 }
 
@@ -862,7 +869,7 @@ void repl() {
     if (token == END)		// reached trailing \n
       continue;
     expr = parse();	      // printf("expr = "); display(expr); NL;
-    if (expr == -1)	      /* skip extraneous right parenthesis */
+    if (EQ(expr, parse_error))	      /* skip extraneous right parenthesis */
       continue;
     env = prim_proc;
     eval();
@@ -899,9 +906,10 @@ int main(int argc, char *argv[]) {
 
   init_symbols();
   init_env();
+
   fp = stdin;
   fname = "stdin";
-  signal(SIGINT, INThandler);
+  signal(SIGINT, interrupt_handler);
   if (setjmp(jmpbuf) == 1)
     goto repl;
 

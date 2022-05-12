@@ -11,9 +11,8 @@
 
 ;;; (map f (x1 x2 ...)) ==> (f(x1) f(x2) ...)
 (define (map f xs)
-  (if (null? xs)
-      nil
-      (cons (f (car xs)) (map f (cdr xs)))))
+  (when (pair? xs)
+    (cons (f (car xs)) (map f (cdr xs)))))
 
 (define (newline)
   (display "\n"))
@@ -37,6 +36,12 @@
 (define print
   (lambda xs
     (map display xs)))
+
+;;; (println x1 x2 ...) -- display all xi, plus a newline
+(define println
+  (lambda xs
+    (map display xs)
+    (newline)))
 
 ;;; (not x) -- negate x
 (define (not x)
@@ -117,6 +122,16 @@
       #f
       (eval-sequence (cdr body) env)))
 
+;;; (apply f x1 x2 ...) ==> apply f to arguments x1 x2 ...
+(define apply
+  (nlambda body
+    (apply$ (car body) (cdr body) $env)))
+
+(define apply$
+  (lambda (f args env)
+    (eval (cons f (eval-sequence args env)))))
+
+
 ;;; (equal? x y) ==> #t if x and y are structurally equal, #f otherwise
 (define (equal? x y)
   (if (and (pair? x) (pair? y))
@@ -138,18 +153,21 @@
 (define (<= x y)
     (or (< x y) (eq? x y)))
 
+;;; (assoc key alist) ==> return item in alist whose car == key, #f otherwise
+(define (assoc key alist)
+  (unless (null? alist)
+    (if (eq? key (caar alist))
+	(car alist)
+	(assoc key (cdr alist)))))
+
+(assert (assoc 'c '((a . 1) (b . 2) (c . 3) (d . 4))) '(c . 3))
+(assert (assoc 'q '((a . 1) (b . 2) (c . 3) (d . 4))) #f)
 
 ;;; append two lists
 (define (append x y)
   (if (null? x) y
 	    (cons (car x)
 	          (append (cdr x) y))))
-
-(assert (append '(1 2 3) '(4 5 6)) '(1 2 3 4 5 6))
-
-(assert (car (list 1 2)) 1)
-(assert (car (cdr (list 1 2))) 2)
-(assert (car (list 'a 'b)) 'a)
 
 ;;; (length l) ==> length of list
 (define (length l)
@@ -199,13 +217,6 @@
 (define (-1+ n)
   (- n 1))
 
-
-(define (abs n)
-  (if (< n 0)
-      (- n)
-      n))
-
-
 (define (range x y)
   (when (< x y)
     (cons x (range (+ x 1) y))))
@@ -218,7 +229,12 @@
 
 ;;; a mod b = a - b*int(a/b)
 (define (mod a b)
-  (- a (* b (/ a b))))
+  (- a (* b (truncate (/ a b)))))
+
+(define (quotient a b)
+  (truncate (/ a b)))
+
+(define pi 3.14159265358979323846264338)
 
 ;;; Simple LCG random number generator
 ;;; X_{n+1} = (a*X_n + c) mod m with m = 2^16+1, a = 75, c = 74
@@ -228,9 +244,13 @@
   (set! *seed* (mod (+ (* 75 *seed*) 74) 65537))
   *seed*)
 
-
-
 ;;; Some basic sanity checking of built-in and defined functions
+
+(assert (append '(1 2 3) '(4 5 6)) '(1 2 3 4 5 6))
+
+(assert (car (list 1 2)) 1)
+(assert (car (cdr (list 1 2))) 2)
+(assert (car (list 'a 'b)) 'a)
 
 (assert (< 2 3) #t)
 (assert (<= 2 3) #t)
@@ -314,11 +334,16 @@
 (assert (equal? '(1) '(1 2)) #f)
 (assert (equal? '(1 (2 3)) '(1 (2 3))) #t)
 (assert (equal? '((1 2) 3) '(1 (2 3))) #f)
-
 (assert (range 1 5) '(1 2 3 4))
-
 (assert (map abs '(-3 1 -4)) '(3 1 4))
+(assert (mod 10 3) 1)
+(assert (quotient 10 3) 3)
+
+(display "testing...") (newline)
+
 (assert (map zero? '(0 1 2)) '(#t #f #f))
+
+(assert (apply + '(1 2)) 3)
 
 (assert (random) 74)
 
