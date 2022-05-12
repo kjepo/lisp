@@ -451,18 +451,16 @@ While I'm not aiming to write a fully fledged Scheme interpreter there
 are a few things I'd like to do:
 
 - `call/cc`
-- Special forms needed for `and`, `or`, `not`.
-- Macros
-- Add more primitives, for instance `let`, `cond`
 - Parser is not "GC safe".
 - Add tab completion? [https://thoughtbot.com/blog/tab-completion-in-gnu-readline]
 - When out of memory, the interpreter doesn't recover nicely (GC doesn't work).
 - There's a bug when an error is reported: the line number shown is from the expression that initiated the call, and not the actual line where the error occurred.
 - Parse command line arguments in a more conventional way so we don't have to write `lisp -h -q` but rather `lisp -hq`.
 - (display expr) needs additional argument for how deep it should print
-- Segmentation fault if you omit the last ')' in play (game2.scm)
+- Segmentation fault if you omit the last ')' in play (game.scm)
 - In Scheme, `1+` can be an identifier.
-- Allow (lambda (x. y) ...) as in other Lisp, where y is bound to the cdr of the argument.
+- Allow (lambda (x. y) ...) as in other Lisp, where y is bound to the rest of the arguments.
+- Introduce `#|` ... `|#` for comments
 
 # References
 
@@ -475,3 +473,7 @@ Abelson and Sussman *Structure and Interpretation of Computer Programs*:
 [https://stackoverflow.com/questions/3465868/how-to-implement-a-lisp-macro-system]
 
 [https://piotrduperas.com/posts/nan-boxing]
+
+[https://craftinginterpreters.com/optimization.html]
+
+[https://leonardschuetz.ch/blog/nan-boxing/]
