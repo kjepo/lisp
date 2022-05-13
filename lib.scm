@@ -338,13 +338,8 @@
 (assert (map abs '(-3 1 -4)) '(3 1 4))
 (assert (mod 10 3) 1)
 (assert (quotient 10 3) 3)
-
-(display "testing...") (newline)
-
 (assert (map zero? '(0 1 2)) '(#t #f #f))
-
 (assert (apply + '(1 2)) 3)
-
 (assert (random) 74)
 
-(display "lib.scm loaded\n")
+(println "lib.scm loaded")

@@ -15,7 +15,6 @@ typedef union {
 #define OUR_NAN(v)     ((v.as_int & 0x7ffc000000000000) == 0x7ffc000000000000)
 #define NAN_MASK       0xffff000000000000  /* 1 11111111111 1111 address */
 #define NAN_VALUE(v)   (v.as_int & (~NAN_MASK))
-#define DOUBLEVALUE(v) (v.as_double)
 #define EQ(v1, v2)     ((v1).as_int == (v2).as_int)
 
 // Symbols
@@ -51,18 +50,7 @@ typedef union {
 // Doubles
 #define IS_DOUBLE(v)   (!OUR_NAN(v))
 #define MAKE_DOUBLE(d) { .as_double = d };
-
-/*
-// tagged pointers - you should let PAIR_TAG = 0 or all bets are off
-#define PAIR_TAG   0
-#define SYMBOL_TAG 1
-#define NUM_TAG    2
-#define PRIM_TAG   3
-#define STR_TAG    4
-#define BOOL_TAG   5
-#define ARRAY_TAG  6
-#define BROKEN_TAG 7	
-*/
+#define DOUBLEVALUE(v) (v.as_double)
 
 extern int objtype(Obj);
 extern int objval(Obj);
@@ -76,11 +64,6 @@ extern Obj NIL, True, False, env, val, unev, argl, proc;
 extern Obj expr, prim_proc, stack, conscell, tmp1, tmp2, tmp3;
 
 extern int verbose, lineno;
-
-/*
-#define car(p) (thecars[p>>3])
-#define cdr(p) (thecdrs[p>>3])
-*/
 
 #define car(v) (thecars[NAN_VALUE(v)])
 #define cdr(v) (thecdrs[NAN_VALUE(v)])
