@@ -190,8 +190,9 @@ to make.
 ## NaN boxing
 
 The Lisp interpreter now uses NaN boxing (see references at the end) to store
-different datatypes in a IEEE 754 NaN value.  This will be described in more
-detail soon, but the added benefit is that the Lisp interpreter now uses double
+different datatypes in a IEEE 754 NaN value.  The implementation details are 
+described in a separate paper [https://github.com/kjepo/lisp/blob/main/nan-boxing.pdf].
+The added benefit is that the Lisp interpreter now uses double
 values internally (although they are shown as integers if the decimal part is zero).
 
 
