@@ -3,6 +3,10 @@
 
 (define nil ())
 
+(define (atom? x)
+  (and (not (null? x))
+       (not (pair? x))))
+
 ;;; (foldl f (x1 x2 ... xn) base) ==> f(x1, f(x2, (f(..., f(xn, base)))))
 (define (foldl f xs base)
   (if (null? xs)
@@ -160,9 +164,6 @@
 	(car alist)
 	(assoc key (cdr alist)))))
 
-(assert (assoc 'c '((a . 1) (b . 2) (c . 3) (d . 4))) '(c . 3))
-(assert (assoc 'q '((a . 1) (b . 2) (c . 3) (d . 4))) #f)
-
 ;;; append two lists
 (define (append x y)
   (if (null? x) y
@@ -246,12 +247,15 @@
 
 ;;; Some basic sanity checking of built-in and defined functions
 
+(assert (atom? 3) #t)
+(assert (atom? 'foo) #t)
+(assert (assoc 'c '((a . 1) (b . 2) (c . 3) (d . 4))) '(c . 3))
+(assert (assoc 'q '((a . 1) (b . 2) (c . 3) (d . 4))) #f)
 (assert (append '(1 2 3) '(4 5 6)) '(1 2 3 4 5 6))
 
 (assert (car (list 1 2)) 1)
 (assert (car (cdr (list 1 2))) 2)
 (assert (car (list 'a 'b)) 'a)
-
 (assert (< 2 3) #t)
 (assert (<= 2 3) #t)
 (assert (<= 3 3) #t)

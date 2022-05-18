@@ -58,8 +58,7 @@ void unbound(Obj id) {
 Obj cons(Obj car_, Obj cdr_) {
   thecars[free_index] = car_;
   thecdrs[free_index] = cdr_;
-  Obj konscell =  MAKE_SEXPR(free_index);
-  conscell = konscell;
+  conscell = (Obj) MAKE_SEXPR(free_index);
   if (++free_index >= MEMSIZE && gc()) {
     fprintf(stderr, "Sorry - memory is full, even after GC\n");
     exit(1);
@@ -72,10 +71,10 @@ typedef enum {
   PRIM_EQP, PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_TRUNCATE, PRIM_NUMBERP, PRIM_SYMBOLP,
   PRIM_STRINGP, PRIM_BOOLEANP, PRIM_NULLP, PRIM_EXIT, PRIM_FILE, PRIM_EVAL } Primitive;
 
-Obj mksym(char *id) { Obj sym = MAKE_SYMBOL(lookup(id)); return sym; }
-Obj mknum(double n) { Obj num = MAKE_DOUBLE(n); return num; }
-Obj mkstr(char *str) { Obj s = MAKE_STR(lookup(str)); return s; }
-Obj mkprim(int n) { Obj prim = MAKE_PRIM(n); return prim; }
+Obj mksym(char *id) { return (Obj) MAKE_SYMBOL(lookup(id));  }
+Obj mknum(double n) { return (Obj) MAKE_DOUBLE(n); }
+Obj mkstr(char *str) { return (Obj) MAKE_STR(lookup(str)); }
+Obj mkprim(int n) { return (Obj) MAKE_PRIM(n); }
 
 void push(Obj x) { stack = cons(x, stack); }
 
@@ -312,10 +311,7 @@ double checknr(Obj p, char *opname) {
 void prim_plus() { val = mknum(checknr(car(argl), "plus") + checknr(cadr(argl), "plus")); }
 void prim_minus() { val = mknum(checknr(car(argl), "minus") - checknr(cadr(argl), "minus")); }
 void prim_times() { val = mknum(checknr(car(argl), "times") * checknr(cadr(argl), "times")); }
-void prim_div() {
-  Obj q = MAKE_DOUBLE(checknr(car(argl), "div") / checknr(cadr(argl), "div"));
-  val = q;
-}
+void prim_div() { val = (Obj) MAKE_DOUBLE(checknr(car(argl), "div") / checknr(cadr(argl), "div")); }
 void prim_lt() { val = checknr(car(argl), "<") < checknr(cadr(argl), "<") ? True : False; }
 void prim_gt() { val = checknr(car(argl), ">") > checknr(cadr(argl), ">") ? True : False; }
 void prim_eqp() {
@@ -897,6 +893,10 @@ int main(int argc, char *argv[]) {
   char *usage = "usage: %s [-q] [-h] [-v] [filename ...]\n";
   progname = argv[0];
   int libloaded = 0;
+
+  assert(sizeof(double) == 8);
+  assert(sizeof(Obj) == 8);
+
   printf("Welcome to Lisp, type \":help\" for help.\n");
 
   thecars = (Obj *)calloc(MEMSIZE, sizeof(Obj));
