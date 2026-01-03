@@ -69,7 +69,7 @@ Obj cons(Obj car_, Obj cdr_) {
 typedef enum {
   PRIM_CAR, PRIM_CDR, PRIM_CONS, PRIM_PAIRP, PRIM_PLUS, PRIM_MINUS, PRIM_TIMES, PRIM_DIV,
   PRIM_EQP, PRIM_LT,  PRIM_GT, PRIM_DISPLAY, PRIM_TRUNCATE, PRIM_NUMBERP, PRIM_SYMBOLP,
-  PRIM_STRINGP, PRIM_BOOLEANP, PRIM_NULLP, PRIM_EXIT, PRIM_FILE, PRIM_EVAL } Primitive;
+  PRIM_STRINGP, PRIM_BOOLEANP, PRIM_NULLP, PRIM_EXIT, PRIM_FILE, PRIM_EVAL, PRIM_CALLCC } Primitive;
 
 Obj mksym(char *id) { return (Obj) MAKE_SYMBOL(lookup(id));  }
 Obj mknum(double n) { return (Obj) MAKE_DOUBLE(n); }
@@ -87,6 +87,32 @@ Obj pop() {
     stack = cdr(stack);
     return x;
   }
+}
+
+void gc_need(int n);  // forward declaration
+int is_compound(Obj p);
+int is_macro(Obj p);
+int is_continuation(Obj p);
+
+// Deep copy a tree of cons cells, but stop at procedures/macros/continuations
+// Uses conscell for temp storage to avoid tmp variable conflicts
+Obj deep_copy_obj(Obj obj) {
+  if (!is_pair(obj))
+    return obj;  // atoms copied by reference
+
+  // Don't recursively copy into procedures/macros/continuations (avoid circular refs)
+  if (is_compound(obj) || is_macro(obj) || is_continuation(obj))
+    return obj;
+
+  conscell = obj;
+  gc_need(2);
+  obj = conscell;
+
+  return cons(deep_copy_obj(car(obj)), deep_copy_obj(cdr(obj)));
+}
+
+Obj copy_stack(Obj stk) {
+  return deep_copy_obj(stk);
 }
 
 void gc_need(int n) {
@@ -110,6 +136,16 @@ Obj mkmacro(Obj parameters, Obj body) {
   gc_need(5);
   parameters = tmp3; body = tmp2;
   return cons(MACRO_SYM, cons(parameters, cons(body, NIL)));
+}
+
+// a continuation is a triple (CONTINUATION cont stack)
+Obj mkcont(Obj cont_val, Obj stack_val) {
+  tmp1 = cont_val;
+  tmp2 = stack_val;
+  gc_need(4);
+  cont_val = tmp1;
+  stack_val = tmp2;
+  return cons(CONTINUATION_SYM, cons(cont_val, cons(stack_val, NIL)));
 }
 
 // destructive append, sets the cdr of l to m (unless l is NIL of course)
@@ -164,6 +200,17 @@ Obj pairup(Obj vars, Obj vals) {
 }
 
 Obj bind(Obj vars, Obj vals, Obj environment) {
+
+  /*
+  printf("bind: ");
+  printf("vars: ");
+  display(vars);
+  NL;
+  printf("vals: ");
+  display(vals);
+  NL;
+*/
+
   if (!IS_SEXPR(vars)) {        // ((lambda l body) '(1 2 3)) => l/'(1 2 3)
     tmp3 = environment;
     tmp1 = cons(vars, NIL);
@@ -240,6 +287,7 @@ void init_symbols() {
   LAMBDA_SYM = mksym("lambda");  NLAMBDA_SYM = mksym("nlambda");
   SETBANG_SYM = mksym("set!");  BEGIN_SYM = mksym("begin");
   PROCEDURE_SYM = mksym("procedure");  MACRO_SYM = mksym("macro");
+  CONTINUATION_SYM = mksym("continuation");
   val = unev = argl = proc = stack = NIL;
   cont = mknum(EVAL_DISPATCH);
 }
@@ -271,12 +319,15 @@ void init_env() {
   add_binding(mksym("exit"), mkprim(PRIM_EXIT), prim_proc);
   add_binding(mksym("file"), mkprim(PRIM_FILE), prim_proc);
   add_binding(mksym("eval"), mkprim(PRIM_EVAL), prim_proc);
+  add_binding(mksym("call/cc"), mkprim(PRIM_CALLCC), prim_proc);
+  add_binding(mksym("call-with-current-continuation"), mkprim(PRIM_CALLCC), prim_proc);
   add_binding(mksym("current-environment"), prim_proc, prim_proc);
 }
 
 int is_variable()        { return IS_SYMBOL(expr); }
 int is_compound(Obj p)   { return is_pair(p) && EQ(PROCEDURE_SYM, car(p)); }
 int is_macro(Obj p)      { return is_pair(p) && EQ(MACRO_SYM, car(p)); }
+int is_continuation(Obj p) { return is_pair(p) && EQ(CONTINUATION_SYM, car(p)); }
 int is_nil(Obj p)        { return EQ(p, NIL); }
 int is_pair(Obj p)       { return IS_SEXPR(p) && !is_nil(p); }
 int is_self_evaluating() { return is_nil(expr) || IS_DOUBLE(expr) || IS_STR(expr); }
@@ -342,16 +393,39 @@ void prim_eval() {
     Obj macroenv = assoc(mksym("$env"), env);
     if (!is_nil(macroenv))
       env = macroenv;
-  } 
+  }
   eval();
   env = pop();
   expr = pop();
 }
 
+void prim_callcc() {
+  // argl contains single argument: the function to call
+  if (is_nil(argl) || !is_nil(cdr(argl))) {
+    error("call/cc requires exactly one argument");
+    return;
+  }
+
+  tmp1 = car(argl);          // Save the function
+  tmp2 = cont;               // Save current continuation
+  tmp3 = copy_stack(stack);  // Deep copy stack
+
+  gc_need(10);
+
+  Obj func = tmp1;
+  Obj k = mkcont(tmp2, tmp3);
+
+  // Invoke func with k as argument
+  proc = func;
+  argl = cons(k, NIL);
+  label = APPLY_DISPATCH;
+}
+
 void (*primitives[])() = {
   prim_car, prim_cdr, prim_cons, prim_pairp, prim_plus, prim_minus, prim_times,
   prim_div, prim_eqp, prim_lt, prim_gt, prim_display, prim_truncate, prim_numberp,
-  prim_symbolp, prim_stringp, prim_booleanp, prim_nullp, prim_exit, prim_file, prim_eval };
+  prim_symbolp, prim_stringp, prim_booleanp, prim_nullp, prim_exit, prim_file, prim_eval,
+  prim_callcc };
 
 void eval() {			// evaluate expr in env
   label = EVAL_DISPATCH;
@@ -579,12 +653,59 @@ void eval() {			// evaluate expr in env
 
     case APPLY_DISPATCH:        // proc contains the evaluated operator
       display_registers("APPLY_DISPATCH");
-      if (IS_PRIM(proc))
+      // Special handling for call/cc
+      if (IS_PRIM(proc) && NAN_VALUE(proc) == PRIM_CALLCC) {
+        // call/cc: capture continuation and apply function to it
+        if (is_nil(argl) || !is_nil(cdr(argl))) {
+          error("call/cc requires exactly one argument");
+          label = UNKNOWN_PROCEDURE_TYPE;
+          continue;
+        }
+
+        // CRITICAL FIX: The cont we need is on the stack (pushed by EV_APPLICATION),
+        // NOT in the cont register!
+        // Normal primitives do: primitives[...](); cont=pop(); jump
+        // We need to capture that same cont and the stack AFTER popping it
+
+        tmp2 = car(stack);         // Save the continuation from top of stack
+        Obj stack_after_pop = cdr(stack);  // Stack without the cont
+
+        // Copy the stack (this uses tmp1 internally, so do it BEFORE saving func)
+        tmp3 = copy_stack(stack_after_pop);  // Deep copy stack AFTER removing cont
+
+        // NOW save the function (after copy_stack is done with tmp1)
+        tmp1 = car(argl);          // Save the function
+
+        gc_need(4);                // Ensure space for 4 cons cells (no GC during this block)
+
+        // Build continuation inline: (CONTINUATION cont stack)
+        // Can't call mkcont() because it would overwrite tmp1!
+        // Build from inside out to avoid needing extra tmp storage
+        Obj k_inner = cons(tmp3, NIL);           // (stack)
+        k_inner = cons(tmp2, k_inner);           // (cont stack)
+        Obj k = cons(CONTINUATION_SYM, k_inner); // (CONTINUATION cont stack)
+
+        // Build argument list: (k) - this is the 4th cons
+        argl = cons(k, NIL);
+
+        // Set proc to the function (tmp1 still valid - it's in root set)
+        proc = tmp1;
+        // Now dispatch to apply the function with the continuation
+        if (is_compound(proc))
+          label = COMPOUND_APPLY;
+        else if (is_continuation(proc))
+          label = CONTINUATION_APPLY;
+        else
+          label = UNKNOWN_PROCEDURE_TYPE;
+        continue;
+      } else if (IS_PRIM(proc))
         label = PRIMITIVE_APPLY;
       else if (is_compound(proc))
         label = COMPOUND_APPLY;
       else if (is_macro(proc))
         label = MACRO_APPLY;
+      else if (is_continuation(proc))
+        label = CONTINUATION_APPLY;
       else
         label = UNKNOWN_PROCEDURE_TYPE;
       continue;
@@ -611,6 +732,24 @@ void eval() {			// evaluate expr in env
       add_binding(mksym("$env"), env, env);
       unev = caddr(proc);
       label = EV_SEQUENCE;
+      continue;
+
+    case CONTINUATION_APPLY:
+      display_registers("CONTINUATION_APPLY");
+      // proc = (CONTINUATION cont stack)
+      // argl = (value) - the value to return
+
+      if (is_nil(argl))
+        val = NIL;
+      else
+        val = car(argl);
+
+      // Restore saved continuation state
+      cont = cadr(proc);       // Restore cont register
+      stack = caddr(proc);     // Restore stack
+
+      // Jump to saved continuation
+      label = DOUBLEVALUE(cont);
       continue;
 
     case PRINT_RESULT:

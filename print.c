@@ -17,7 +17,7 @@ char *continuation_string[] = { "PRINT_RESULT", "EV_IF_DECIDE",
   "EV_DEFINITION", "EV_LAMBDA", "EV_NLAMBDA", "EV_BEGIN", "EV_APPLICATION",
   "EV_APPL_OPERAND_LOOP", "EV_APPL_LAST_ARG", "EV_SEQUENCE",
   "EV_SEQUENCE_LAST_EXP", "APPLY_DISPATCH", "PRIMITIVE_APPLY",
-  "COMPOUND_APPLY", "MACRO_APPLY", "UNKNOWN_PROCEDURE_TYPE",
+  "COMPOUND_APPLY", "MACRO_APPLY", "CONTINUATION_APPLY", "UNKNOWN_PROCEDURE_TYPE",
   "UNKNOWN_EXPRESSION_TYPE" };
 
 Obj BROKEN_HEART = MAKE_BROKEN(0);
@@ -34,7 +34,9 @@ void display2(Obj expr, int dotted, int level) {
     if (is_nil(expr)) {
       printf("()");
     } else {
-      if (EQ(car(expr), PROCEDURE_SYM)) { 
+      if (EQ(car(expr), CONTINUATION_SYM)) {
+	printf("<continuation>");
+      } else if (EQ(car(expr), PROCEDURE_SYM)) {
 	printf("<λ");
 	display2(cadr(expr), 0, level+1);
 	printf(".");
@@ -68,7 +70,7 @@ void display2(Obj expr, int dotted, int level) {
       else
 	printf("%e", x);	/* show as e.g. 3.14e12 */
     } else
-      printf("%f", x);		/* show as e.g. 3.14 */
+      printf("%.14f", x);       /* show as e.g. 3.1415926... */
   } else {
     fprintf(stderr, "display2: can't happen: %llx\n", expr.as_int);
     exit(1);

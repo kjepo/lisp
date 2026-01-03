@@ -1,7 +1,5 @@
 # explicit Lisp
 
-![LISP Machine logo](assets/lisp-machine-logo.png)
-
 News flash: I have rewritten the Lisp machine to use so called NaN boxing
 for storing S-expressions, symbols, numbers, etc.  This will be described
 later, but you can now use double precision floating point as well. 
@@ -129,7 +127,7 @@ Each invocation of `(next)` yields another integer `1`, `2`, `3`, etc.
 - `(procedure arg₁ arg₂  ...)` applies `procedure` to the arguments `arg₁`, `arg₂`, etc,
 where `procedure` is either the result of a `lambda` expression, or one of the built-in
 functions `car`, `cdr`, `cons`, `pair?`, `+`, `-`, `*`, `<`, `>`, `display`, `list`,
-`number?`, `symbol?`, `eq?` and `file`.
+`number?`, `symbol?`, `eq?`, `file`, and `call/cc` (also `call-with-current-continuation`).
 
 # Primitives
 
@@ -179,10 +177,76 @@ With a macro we can delay the evaluation of the arguments until they are needed.
 
 Here, `and` accepts an unevaluated list of arguments `xs` and passes it on to `and$` together
 with the implicit environment `$env` which is a special value bound to the caller's environment.
-If `eval` (inside `and$`) didn't use this environment, the macro would be evaluated in the 
+If `eval` (inside `and$`) didn't use this environment, the macro would be evaluated in the
 environment of `and` which is not what we want.
 
- 
+# First-class continuations
+
+The interpreter now supports `call/cc` (also available as `call-with-current-continuation`),
+which provides first-class continuations. A continuation represents "the rest of the computation" -
+what to do with a value once it's been computed.
+
+## Basic usage
+
+The simplest use of `call/cc` is to escape from a computation:
+
+```scheme
+(call/cc (lambda (k) (+ 5 (k 10))))  ⇒ 10
+```
+
+Here, `k` is the continuation - a procedure that, when invoked, abandons the current
+computation (the `+ 5`) and returns its argument (10) as the result of the entire `call/cc`
+expression.
+
+If the continuation is never invoked, `call/cc` behaves normally:
+
+```scheme
+(call/cc (lambda (k) (+ 5 10)))  ⇒ 15
+```
+
+## Storing and invoking continuations
+
+Continuations are first-class values and can be stored and invoked multiple times:
+
+```scheme
+(define saved-cont #f)
+
+;; First time: capture the continuation and return 5
+(define result (+ 100 (call/cc (lambda (k)
+                                  (set! saved-cont k)
+                                  5))))
+;; result is 105 (100 + 5)
+
+;; Later: invoke the saved continuation with a different value
+(saved-cont 20)
+;; This jumps back to the (+ 100 ...) expression and returns 120 (100 + 20)
+```
+
+When you invoke a stored continuation, execution jumps back to the point where the continuation
+was captured, as if `call/cc` had returned the new value instead of the original one.
+
+## Implementation
+
+Continuations are implemented as first-class objects containing:
+- The continuation register (where to return)
+- A deep copy of the stack (all pending operations)
+
+When `call/cc` is invoked, it:
+1. Captures the current continuation state
+2. Packages it as a procedure-like object
+3. Calls the provided function with this continuation object
+
+When a captured continuation is invoked, it:
+1. Restores the saved continuation register
+2. Restores the saved stack
+3. Jumps to the saved continuation with the provided value
+
+The key challenge is ensuring that captured continuations contain independent copies of all
+mutable data structures (particularly argument lists on the stack). The implementation uses
+deep copying to avoid sharing mutable state between the current computation and captured
+continuations.
+
+
 # Implementation details
 
 While writing the interpreter I was faced with several difficulties which
@@ -395,7 +459,6 @@ if (NULL == fgets(input, 512, fp))
 While I'm not aiming to write a fully fledged Scheme interpreter there
 are a few things I'd like to do:
 
-- `call/cc`
 - Parser is not "GC safe".
 - Add tab completion? [https://thoughtbot.com/blog/tab-completion-in-gnu-readline]
 - When out of memory, the interpreter doesn't recover nicely (GC doesn't work).
