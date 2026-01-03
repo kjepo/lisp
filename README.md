@@ -1,5 +1,7 @@
 # explicit Lisp
 
+![LISP Machine logo](assets/lisp-machine-logo.png)
+
 News flash: I have rewritten the Lisp machine to use so called NaN boxing
 for storing S-expressions, symbols, numbers, etc.  This will be described
 later, but you can now use double precision floating point as well. 
@@ -420,3 +422,9 @@ Abelson and Sussman *Structure and Interpretation of Computer Programs*:
 [https://craftinginterpreters.com/optimization.html]
 
 [https://leonardschuetz.ch/blog/nan-boxing/]
+
+[https://www.bcl.hamilton.ie/~barak/teach/F97/CS257/macros.html]
+
+[https://blog.veitheller.de/Scheme_Macros_III:_Defining_let.html]
+
+[https://old.reddit.com/r/ProgrammingLanguages/comments/1092p82/another_nanbased_tagging_strategy_for_dynamic/]
