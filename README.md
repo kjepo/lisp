@@ -2,9 +2,13 @@
 
 <img src="assets/lisp-machine-logo.png" alt="LISP Machine logo" width="300">
 
-News flash: I have rewritten the Lisp machine to use so called NaN boxing
-for storing S-expressions, symbols, numbers, etc.  This will be described
-later, but you can now use double precision floating point as well. 
+News flash: The Lisp machine now supports `call/cc`, read more under
+the section "First class continuations".
+
+I have also written the Lisp machine to use so called NaN boxing
+for storing S-expressions, symbols, numbers, etc.  This is described
+in the document `nan-boxing.pdf` and you can now use double precision
+floating point as well. 
 
 This is an exercise in building a Lisp machine in a series of steps
 so that (ultimately) we _could_ write it in assembler.
