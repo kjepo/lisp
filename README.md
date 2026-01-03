@@ -1,5 +1,7 @@
 # explicit Lisp
 
+<img src="assets/lisp-machine-logo.png" alt="LISP Machine logo" width="300">
+
 News flash: I have rewritten the Lisp machine to use so called NaN boxing
 for storing S-expressions, symbols, numbers, etc.  This will be described
 later, but you can now use double precision floating point as well. 
