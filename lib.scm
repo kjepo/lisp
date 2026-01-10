@@ -237,6 +237,17 @@
 
 (define pi 3.14159265358979323846264338)
 
+(define (sin x)
+  (define x1 (mod x (* 2 pi)))
+  (let [(y (+ (* (/ 4.0 pi) x1) (* (- (/ 4.0 (* pi pi))) x (abs x1))))]
+    (+ y (* 0.225 (- (* y (abs y)) y)))))
+
+(define (cos x)
+  (sin (- (/ pi 2) x)))
+
+(define (tan x)
+  (/ (sin x) (cos x)))
+
 ;;; Simple LCG random number generator
 ;;; X_{n+1} = (a*X_n + c) mod m with m = 2^16+1, a = 75, c = 74
 ;;; See https://en.wikipedia.org/wiki/Linear_congruential_generator
