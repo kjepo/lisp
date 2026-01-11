@@ -88,7 +88,7 @@
 
 ;;; (let ((x 1)
 ;;;       (y 2))
-;;;       (+ x y)) ==> ((lambda (x y) (+ x y)) 1 2)
+;;;      (+ x y)) ==> ((lambda (x y) (+ x y)) 1 2)
 
 (define let
   (nlambda body
@@ -98,6 +98,23 @@
   (eval
    (cons (cons 'lambda (cons (map car initializers) body)) (map cadr initializers))
    env))
+
+;;; (let* ((x 1)
+;;;        (y (+ x 1)))
+;;;       (+ x y)) ==> nested lets, each binding sees previous bindings
+
+(define let*
+  (nlambda body
+    (let*$ (car body) (cdr body) $env)))
+
+(define (let*$ initializers body env)
+  (if (null? initializers)
+      (eval-sequence body env)
+      (eval
+       (list 'let
+             (list (car initializers))
+             (cons 'let* (cons (cdr initializers) body)))
+       env)))
 
 ;;; (eval-sequence xs env) -- evaluate all x in xs, in environment env
 (define (eval-sequence xs env)
@@ -218,6 +235,19 @@
 (define (-1+ n)
   (- n 1))
 
+;;; (sqrt x) ==> square root of x using Newton's method
+(define (sqrt x)
+  (define (improve guess)
+    (/ (+ guess (/ x guess)) 2))
+  (define (good-enough? guess)
+    (< (abs (- (* guess guess) x)) 0.00001))
+  (define (iter guess)
+    (if (good-enough? guess)
+        guess
+        (iter (improve guess))))
+  (iter 1.0))
+
+;;; (range x y) ==> list of all integers [x, y[
 (define (range x y)
   (when (< x y)
     (cons x (range (+ x 1) y))))
@@ -236,17 +266,6 @@
   (truncate (/ a b)))
 
 (define pi 3.14159265358979323846264338)
-
-(define (sin x)
-  (define x1 (mod x (* 2 pi)))
-  (let [(y (+ (* (/ 4.0 pi) x1) (* (- (/ 4.0 (* pi pi))) x (abs x1))))]
-    (+ y (* 0.225 (- (* y (abs y)) y)))))
-
-(define (cos x)
-  (sin (- (/ pi 2) x)))
-
-(define (tan x)
-  (/ (sin x) (cos x)))
 
 ;;; Simple LCG random number generator
 ;;; X_{n+1} = (a*X_n + c) mod m with m = 2^16+1, a = 75, c = 74
@@ -329,6 +348,11 @@
        (y 2))
    (plus x y)) 3)
 
+(assert
+ (let* ((x 1)
+        (y (plus x 1)))
+   (plus x y)) 3)
+
 (assert (zero? 0) #t)
 (assert (zero? 17) #f)
 
@@ -356,5 +380,6 @@
 (assert (map zero? '(0 1 2)) '(#t #f #f))
 (assert (apply + '(1 2)) 3)
 (assert (random) 74)
+(assert (< (abs (- (sqrt 2) 1.41421356)) 0.0001) #t)
 
 (println "lib.scm loaded")
